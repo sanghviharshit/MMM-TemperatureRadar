@@ -15,8 +15,8 @@ Module.register("MMM-TemperatureRadar", {
 		updateInterval: 5 * 60 * 1000, // Update every 5 minutes
 		haUrl: "", // Home Assistant URL (e.g., "http://homeassistant.local:8123")
 		haToken: "", // Long-lived access token from Home Assistant
-		width: "400px", // Chart width
-		height: "400px", // Chart height
+		width: "200px", // Chart width
+		height: "200px", // Chart height
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
 			{ room: "Kitchen", entity_id: "sensor.kitchen_temperature" },
@@ -69,8 +69,8 @@ Module.register("MMM-TemperatureRadar", {
     getDom: function() {
         const wrapper = document.createElement("div");
         wrapper.className = "temperature-radar-wrapper";
-        wrapper.style.minWidth = "400px"; // Set a minimum width for the chart
-        wrapper.style.minHeight = "400px"; // Set a minimum height for the chart
+        wrapper.style.minWidth = "200px"; // Set a minimum width for the chart
+        wrapper.style.minHeight = "200px"; // Set a minimum height for the chart
         
         const chartDiv = document.createElement("div");
         chartDiv.id = "temperature-radar-chart";
