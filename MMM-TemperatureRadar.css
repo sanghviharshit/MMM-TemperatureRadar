@@ -1,0 +1,27 @@
+/* .temperature-radar-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 400px;
+}
+/* 
+#temperature-radar-chart {
+    background-color: transparent;
+} */
+
+
+/* Make all chart text white */
+/* #temperature-radar-chart g text {
+    fill: #EEEEEE !important;
+} */
+
+/* Style tooltips */
+/* #temperature-radar-chart .am5-tooltip {
+    background-color: rgba(233, 233, 233, 0.8) !important;
+    color: #EEEEEE !important;
+    border: 1px solid #666666 !important;
+}
+
+#temperature-radar-chart .am5-tooltip-label {
+    color: #FFFFFF !important;
+}  */

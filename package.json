@@ -1,0 +1,9 @@
+{
+  "name": "MMM-TemperatureRadar",
+  "version": "1.0.0",
+  "description": "A MagicMirror module for displaying temperature readings in a radar chart",
+  "main": "MMM-TemperatureRadar.js",
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  }
+}
