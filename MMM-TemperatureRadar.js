@@ -69,11 +69,9 @@ Module.register("MMM-TemperatureRadar", {
     getDom: function() {
         const wrapper = document.createElement("div");
         wrapper.className = "temperature-radar-wrapper";
-        wrapper.style.minWidth = "200px"; // Set a minimum width for the chart
-        wrapper.style.minHeight = "200px"; // Set a minimum height for the chart
-        
         const chartDiv = document.createElement("div");
-        chartDiv.id = "temperature-radar-chart";
+        
+		chartDiv.id = "temperature-radar-chart";
         chartDiv.style.width = this.config.width;
         chartDiv.style.height = this.config.height;
         

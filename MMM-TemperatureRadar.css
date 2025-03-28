@@ -1,8 +1,7 @@
-/* .temperature-radar-wrapper {
+.temperature-radar-wrapper {
     display: flex;
-    justify-content: center;
+    justify-content: right;
     align-items: center;
-    min-width: 400px;
 }
 /* 
 #temperature-radar-chart {
