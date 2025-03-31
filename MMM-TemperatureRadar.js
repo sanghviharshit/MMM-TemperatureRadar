@@ -17,6 +17,7 @@ Module.register("MMM-TemperatureRadar", {
 		haToken: "", // Long-lived access token from Home Assistant
 		width: "200px", // Chart width
 		height: "200px", // Chart height
+		units: config.units, // Use global temperature units configuration
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
 			{ room: "Kitchen", entity_id: "sensor.kitchen_temperature" },
@@ -109,6 +110,14 @@ Module.register("MMM-TemperatureRadar", {
 		}, this.config.updateInterval);
 	},
 
+	convertTemperature: function(temp, fromUnit, toUnit) {
+		if (!fromUnit || !toUnit) return temp;
+		if (fromUnit === toUnit) return temp;
+		if (fromUnit === "°C" && toUnit === "°F") return (temp * 9/5) + 32;
+		if (fromUnit === "°F" && toUnit === "°C") return (temp - 32) * 5/9;
+		return temp;
+	},
+
 	createChart: function () {
 		am5.ready(() => {
 			// Dispose of previous chart if it exists
@@ -175,7 +184,7 @@ Module.register("MMM-TemperatureRadar", {
 			var yAxis = this.chart.yAxes.push(
 				am5xy.ValueAxis.new(this.root, {
 					renderer: yRenderer,
-                    numberFormat: "#'°F'",
+                    numberFormat: this.config.units === "imperial" ? "#'°F'" : "#'°C'",
 				})
 			);
 
@@ -189,7 +198,7 @@ Module.register("MMM-TemperatureRadar", {
 					categoryXField: "room",
 					stroke: am5.color("#808080"), // Add this line to set gray color
 					tooltip: am5.Tooltip.new(this.root, {
-						labelText: "{valueY}°F"
+						labelText: "{valueY}" + (this.config.units === "imperial" ? "°F" : "°C")
 					})
 				})
 			);
@@ -218,9 +227,19 @@ Module.register("MMM-TemperatureRadar", {
 				});
 			});
 
+			// Convert temperatures to the configured unit
+			const convertedTemperatures = this.temperatures.map(temp => ({
+				...temp,
+				temperature: this.convertTemperature(
+					temp.temperature,
+					temp.unit_of_measurement,
+					this.config.units === "imperial" ? "°F" : "°C"
+				)
+			}));
+
 			// Set data
-			xAxis.data.setAll(this.temperatures);
-			series.data.setAll(this.temperatures);
+			xAxis.data.setAll(convertedTemperatures);
+			series.data.setAll(convertedTemperatures);
 
 			// Animate chart and series in
 			series.appear(1000);

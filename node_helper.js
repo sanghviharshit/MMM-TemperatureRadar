@@ -11,7 +11,12 @@ module.exports = NodeHelper.create({
         
         if (!config.haUrl || !config.haToken) {
             console.log("No HA config, sending demo data");
-            this.sendSocketNotification("TEMPERATURES_RESULT", config.demoData);
+            // Add unit_of_measurement to demo data
+            const demoDataWithUnits = config.demoData.map(data => ({
+                ...data,
+                unit_of_measurement: "°C" // Demo data is in Celsius
+            }));
+            this.sendSocketNotification("TEMPERATURES_RESULT", demoDataWithUnits);
             return;
         }
 
@@ -31,7 +36,10 @@ module.exports = NodeHelper.create({
             .catch(error => {
                 console.error(`Error fetching data for ${entity.room}:`, error);
                 const demoTemp = config.demoData.find(d => d.room === entity.room);
-                return { state: demoTemp ? demoTemp.temperature : 20 };
+                return { 
+                    state: demoTemp ? demoTemp.temperature : 20,
+                    attributes: { unit_of_measurement: "°C" } // Default to Celsius for demo data
+                };
             })
         );
 
@@ -39,7 +47,8 @@ module.exports = NodeHelper.create({
             .then(results => {
                 const temperatures = results.map((data, index) => ({
                     room: config.entities[index].room,
-                    temperature: parseFloat(data.state)
+                    temperature: parseFloat(data.state),
+                    unit_of_measurement: data.attributes?.unit_of_measurement || "°C" // Get unit from HA or default to Celsius
                 }));
                 
                 console.log("Sending temperatures:", temperatures);
@@ -48,7 +57,12 @@ module.exports = NodeHelper.create({
             .catch(error => {
                 console.error("Error fetching temperatures:", error);
                 console.log("Falling back to demo data");
-                this.sendSocketNotification("TEMPERATURES_RESULT", config.demoData);
+                // Add unit_of_measurement to demo data
+                const demoDataWithUnits = config.demoData.map(data => ({
+                    ...data,
+                    unit_of_measurement: "°C" // Demo data is in Celsius
+                }));
+                this.sendSocketNotification("TEMPERATURES_RESULT", demoDataWithUnits);
             });
     },
 
