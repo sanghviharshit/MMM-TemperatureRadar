@@ -35,21 +35,24 @@ module.exports = NodeHelper.create({
             })
             .catch(error => {
                 console.error(`Error fetching data for ${entity.room}:`, error);
-                const demoTemp = config.demoData.find(d => d.room === entity.room);
-                return { 
-                    state: demoTemp ? demoTemp.temperature : 20,
-                    attributes: { unit_of_measurement: "°C" } // Default to Celsius for demo data
-                };
+                return null; // Return null instead of demo data on error
             })
         );
 
         Promise.all(promises)
             .then(results => {
-                const temperatures = results.map((data, index) => ({
-                    room: config.entities[index].room,
-                    temperature: parseFloat(data.state),
-                    unit_of_measurement: data.attributes?.unit_of_measurement || "°C" // Get unit from HA or default to Celsius
-                }));
+                // Filter out null results and map the valid ones
+                const temperatures = results
+                    .map((data, index) => ({
+                        room: config.entities[index].room,
+                        data: data
+                    }))
+                    .filter(item => item.data !== null)
+                    .map(item => ({
+                        room: item.room,
+                        temperature: parseFloat(item.data.state),
+                        unit_of_measurement: item.data.attributes?.unit_of_measurement || "°C"
+                    }));
                 
                 console.log("Sending temperatures:", temperatures);
                 this.sendSocketNotification("TEMPERATURES_RESULT", temperatures);

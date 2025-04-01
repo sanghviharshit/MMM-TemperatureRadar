@@ -99,7 +99,12 @@ Module.register("MMM-TemperatureRadar", {
 	},
 
 	getScripts: function () {
-		return ["https://cdn.amcharts.com/lib/5/index.js", "https://cdn.amcharts.com/lib/5/xy.js", "https://cdn.amcharts.com/lib/5/radar.js", "https://cdn.amcharts.com/lib/5/themes/Animated.js"];
+		return [
+			"https://cdn.amcharts.com/lib/5/index.js",
+			"https://cdn.amcharts.com/lib/5/xy.js",
+			"https://cdn.amcharts.com/lib/5/radar.js",
+			"https://cdn.amcharts.com/lib/5/themes/Animated.js"
+		];
 	},
 
 	scheduleUpdate: function () {
@@ -153,9 +158,10 @@ Module.register("MMM-TemperatureRadar", {
 
 			xRenderer.labels.template.setAll({
 				fill: am5.color(0xffffff),
-				fontSize: "0.5em",
-				radius: 10
+				fontSize: "0.8em",
+				radius: 10,
 			});
+
 			var xAxis = this.chart.xAxes.push(
 				am5xy.CategoryAxis.new(this.root, {
 					maxDeviation: 0,
@@ -178,7 +184,7 @@ Module.register("MMM-TemperatureRadar", {
 
 			yRenderer.labels.template.setAll({
 				fill: am5.color(0xffffff),
-				fontSize: "0.5em"
+				fontSize: "0.6em",
 			});
 
 			var yAxis = this.chart.yAxes.push(
@@ -196,7 +202,7 @@ Module.register("MMM-TemperatureRadar", {
 					yAxis: yAxis,
 					valueYField: "temperature",
 					categoryXField: "room",
-					stroke: am5.color("#808080"), // Add this line to set gray color
+					stroke: am5.color("#808080"),
 					tooltip: am5.Tooltip.new(this.root, {
 						labelText: "{valueY}" + (this.config.units === "imperial" ? "°F" : "°C")
 					})
