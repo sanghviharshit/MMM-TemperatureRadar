@@ -108,9 +108,15 @@ Module.register("MMM-TemperatureRadar", {
 	},
 
 	scheduleUpdate: function () {
-		setInterval(() => {
+		// Clear any existing interval
+		if (this.updateIntervalId) {
+			clearInterval(this.updateIntervalId);
+		}
+		
+		// Set up new interval
+		this.updateIntervalId = setInterval(() => {
 			if (this.config.haUrl && this.config.haToken) {
-				this.getTemperatures();
+				this.sendSocketNotification("GET_TEMPERATURES", this.config);
 			}
 		}, this.config.updateInterval);
 	},

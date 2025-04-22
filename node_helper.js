@@ -47,7 +47,7 @@ module.exports = NodeHelper.create({
                         room: config.entities[index].room,
                         data: data
                     }))
-                    .filter(item => item.data !== null)
+                    .filter(item => item.data !== null && item.data.state !== "unavailable")
                     .map(item => ({
                         room: item.room,
                         temperature: parseFloat(item.data.state),
