@@ -45,6 +45,7 @@ Module.register("MMM-TemperatureRadar", {
 		this.chart = null;
 		this.root = null;
 		this.chartTimer = null;
+		this.updateIntervalId = null;
 
 		// Use demo data if HA not configured
 		if (!this.config.haUrl || !this.config.haToken) {
@@ -64,6 +65,36 @@ Module.register("MMM-TemperatureRadar", {
 		this.scheduleUpdate();
 	},
 
+	stop: function() {
+		Log.info("Stopping module: " + this.name);
+		if (this.updateIntervalId) {
+			clearInterval(this.updateIntervalId);
+			this.updateIntervalId = null;
+		}
+		if (this.chartTimer) {
+			clearTimeout(this.chartTimer);
+			this.chartTimer = null;
+		}
+		if (this.root) {
+			this.root.dispose();
+			this.root = null;
+			this.chart = null;
+		}
+	},
+
+	suspend: function() {
+		Log.info("Suspending module: " + this.name);
+		if (this.updateIntervalId) {
+			clearInterval(this.updateIntervalId);
+			this.updateIntervalId = null;
+		}
+	},
+
+	resume: function() {
+		Log.info("Resuming module: " + this.name);
+		this.scheduleUpdate();
+	},
+
 	socketNotificationReceived: function(notification, payload) {
 		if (notification === "TEMPERATURES_RESULT") {
 			Log.info("Received temperatures:", payload);
@@ -76,22 +107,21 @@ Module.register("MMM-TemperatureRadar", {
 	getDom: function() {
 		const wrapper = document.createElement("div");
 		wrapper.className = "temperature-radar-wrapper";
-		const chartDiv = document.createElement("div");
-
-		chartDiv.id = "temperature-radar-chart-" + this.identifier;
-		chartDiv.style.width = this.config.width;
-		chartDiv.style.height = this.config.height;
 
 		if (!this.loaded) {
-			wrapper.innerHTML = "Loading...";
+			wrapper.textContent = "Loading...";
 			return wrapper;
 		}
 
+		const chartDiv = document.createElement("div");
+		chartDiv.id = "temperature-radar-chart-" + this.identifier;
+		chartDiv.style.width = typeof this.config.width === "number" ? this.config.width + "px" : this.config.width;
+		chartDiv.style.height = typeof this.config.height === "number" ? this.config.height + "px" : this.config.height;
 		wrapper.appendChild(chartDiv);
 
 		// Create chart after a short delay to ensure DOM is ready.
 		// Clear any pending timer to prevent stacked chart-creation calls.
-		if (this.loaded && this.temperatures.length > 0) {
+		if (this.temperatures.length > 0) {
 			Log.info("Creating chart with data:", this.temperatures);
 			if (this.chartTimer) {
 				clearTimeout(this.chartTimer);
@@ -167,7 +197,7 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Create X axes and their renderers
-			var xRenderer = am5radar.AxisRendererCircular.new(this.root, {
+			const xRenderer = am5radar.AxisRendererCircular.new(this.root, {
 				minGridDistance: 0
 			});
 			xRenderer.grid.template.setAll({
@@ -182,7 +212,7 @@ Module.register("MMM-TemperatureRadar", {
 				radius: 10,
 			});
 
-			var xAxis = this.chart.xAxes.push(
+			const xAxis = this.chart.xAxes.push(
 				am5xy.CategoryAxis.new(this.root, {
 					maxDeviation: 0,
 					categoryField: "room",
@@ -192,7 +222,7 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Create Y axes and their renderers
-			var yRenderer = am5radar.AxisRendererRadial.new(this.root, {
+			const yRenderer = am5radar.AxisRendererRadial.new(this.root, {
 				minGridDistance: 20,
 			});
 
@@ -207,7 +237,7 @@ Module.register("MMM-TemperatureRadar", {
 				fontSize: "0.6em",
 			});
 
-			var yAxis = this.chart.yAxes.push(
+			const yAxis = this.chart.yAxes.push(
 				am5xy.ValueAxis.new(this.root, {
 					renderer: yRenderer,
 					numberFormat: this.config.units === "fahrenheit" ? "#'°F'" : "#'°C'",
@@ -215,7 +245,7 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Create series
-			var series = this.chart.series.push(
+			const series = this.chart.series.push(
 				am5radar.RadarLineSeries.new(this.root, {
 					name: "Temperature",
 					xAxis: xAxis,

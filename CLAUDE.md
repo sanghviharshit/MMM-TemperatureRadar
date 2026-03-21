@@ -17,14 +17,20 @@ MMM-TemperatureRadar/
 ├── MMM-TemperatureRadar.js   # Main module file (frontend, runs in browser)
 ├── node_helper.js            # Backend helper (runs in Node.js)
 ├── MMM-TemperatureRadar.css  # Module styles
-├── package.json              # npm metadata; single dependency: node-fetch@2
+├── package.json              # npm metadata; dependencies: node-fetch@2; devDependencies: jest
 ├── README.md                 # User-facing documentation and config reference
 ├── LICENSE                   # MIT License
 ├── screenshot.png            # Visual demo shown in README
-└── .gitignore                # Excludes node_modules/ and package-lock.json
+├── .gitignore                # Excludes node_modules/, package-lock.json, coverage/
+├── tests/
+│   ├── node_helper.test.js            # Jest tests for node_helper.js
+│   └── MMM-TemperatureRadar.test.js   # Jest tests for the module frontend
+└── .github/
+    └── workflows/
+        └── ci.yml            # GitHub Actions CI (Node 18.x and 20.x matrix)
 ```
 
-No build system, test runner, or CI/CD configuration exists in this project.
+No build system. Jest is used for testing (`npm test`). CI runs via GitHub Actions (`.github/workflows/ci.yml`).
 
 ## Architecture
 
@@ -39,7 +45,7 @@ MagicMirror² modules consist of two parts that communicate via socket notificat
 
 **Data flow:**
 1. Module calls `this.sendSocketNotification("GET_TEMPERATURES", config)` on startup and on each update interval.
-2. `node_helper.js` receives the notification, fetches temperature data from Home Assistant (or returns demo data), then calls `this.sendSocketNotification("TEMPERATURE_DATA", data)`.
+2. `node_helper.js` receives the notification, fetches temperature data from Home Assistant (or returns demo data), then calls `this.sendSocketNotification("TEMPERATURES_RESULT", data)`.
 3. Module receives data via `socketNotificationReceived()` and re-renders the chart.
 
 ### Chart Library
@@ -138,9 +144,16 @@ This module requires a running MagicMirror² instance. There is no standalone de
 
 There is no transpilation, bundling, or minification. Files are served directly. Edit and reload.
 
-### No Tests
+### Tests
 
-There are currently no automated tests or linting configuration. When adding tests or a linter, document the commands here.
+Jest is used for unit tests. Run with:
+
+```bash
+npm test              # run all tests
+npm run test:coverage # run with coverage report
+```
+
+Tests live in `tests/`. All MagicMirror² globals and amCharts5 CDN globals are stubbed in the test files — see `tests/MMM-TemperatureRadar.test.js` for the setup pattern.
 
 ## Home Assistant API
 
@@ -160,7 +173,8 @@ Response fields used:
 - **Do not add a build system** unless explicitly requested. The simplicity is intentional.
 - **Do not add `async/await`** when modifying existing code — maintain `.then()` style for consistency.
 - **Preserve the demo data fallback** — it is a core feature for users without Home Assistant.
-- **Chart disposal**: Always call `this.chart.dispose()` (or equivalent amCharts5 root disposal) before re-creating the chart to prevent memory leaks.
+- **Lifecycle methods**: The module implements `stop()`, `suspend()`, and `resume()`. `stop()` clears all timers and disposes the amCharts root. `suspend()` pauses the update interval; `resume()` restarts it. Always keep these in sync with `scheduleUpdate()`.
+- **Chart disposal**: Always call `this.root.dispose()` (amCharts5 root disposal) before re-creating the chart to prevent memory leaks. `stop()` handles this on module teardown.
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
 - **MagicMirror² globals**: `Log`, `Module`, `NodeHelper` are injected by the framework — do not import them.
 - **node-fetch v2**: The project uses `node-fetch@2` (CommonJS). Do not upgrade to v3+ (ESM-only) without migrating `node_helper.js` to ESM.

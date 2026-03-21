@@ -102,6 +102,7 @@ global.document = {
         className: "",
         id: "",
         style: {},
+        textContent: "",
         innerHTML: "",
         appendChild: jest.fn(),
     }))
@@ -171,6 +172,9 @@ describe("MMM-TemperatureRadar module", () => {
 
         it("module definition has expected method signatures", () => {
             expect(typeof capturedModuleDefinition.start).toBe("function");
+            expect(typeof capturedModuleDefinition.stop).toBe("function");
+            expect(typeof capturedModuleDefinition.suspend).toBe("function");
+            expect(typeof capturedModuleDefinition.resume).toBe("function");
             expect(typeof capturedModuleDefinition.getDom).toBe("function");
             expect(typeof capturedModuleDefinition.getStyles).toBe("function");
             expect(typeof capturedModuleDefinition.getScripts).toBe("function");
@@ -485,16 +489,35 @@ describe("MMM-TemperatureRadar module", () => {
             expect(global.document.createElement).toHaveBeenCalledWith("div");
         });
 
-        it("shows 'Loading...' when not yet loaded", () => {
+        it("shows 'Loading...' via textContent when not yet loaded", () => {
             const mod = makeModuleInstance({ loaded: false });
             const wrapper = mod.getDom();
-            expect(wrapper.innerHTML).toBe("Loading...");
+            expect(wrapper.textContent).toBe("Loading...");
         });
 
-        it("does not show 'Loading...' when loaded", () => {
+        it("does not set textContent to 'Loading...' when loaded", () => {
             const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA });
             const wrapper = mod.getDom();
-            expect(wrapper.innerHTML).not.toBe("Loading...");
+            expect(wrapper.textContent).not.toBe("Loading...");
+        });
+
+        it("normalizes numeric width to CSS string (e.g. 400 → '400px')", () => {
+            const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA, config: { width: 400, height: 300 } });
+            mod.getDom();
+            // The chartDiv is the second createElement call result
+            const calls = global.document.createElement.mock.results;
+            const chartDiv = calls[calls.length - 1].value;
+            expect(chartDiv.style.width).toBe("400px");
+            expect(chartDiv.style.height).toBe("300px");
+        });
+
+        it("passes string width unchanged (e.g. '300px')", () => {
+            const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA, config: { width: "300px", height: "250px" } });
+            mod.getDom();
+            const calls = global.document.createElement.mock.results;
+            const chartDiv = calls[calls.length - 1].value;
+            expect(chartDiv.style.width).toBe("300px");
+            expect(chartDiv.style.height).toBe("250px");
         });
 
         it("schedules createChart via setTimeout when loaded with data", () => {
@@ -535,6 +558,131 @@ describe("MMM-TemperatureRadar module", () => {
             mod.getDom();
             jest.advanceTimersByTime(500);
             expect(mod.createChart).not.toHaveBeenCalled();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("stop()", () => {
+        it("clears the update interval", () => {
+            const mod = makeModuleInstance();
+            mod.scheduleUpdate();
+            expect(mod.updateIntervalId).not.toBeNull();
+
+            mod.stop();
+            expect(mod.updateIntervalId).toBeNull();
+        });
+
+        it("stops the interval from firing after stop()", () => {
+            const mod = makeModuleInstance({ config: { updateInterval: 5000, haUrl: "http://ha.local", haToken: "x", entities: [] } });
+            mod.scheduleUpdate();
+            mod.stop();
+
+            jest.advanceTimersByTime(5000);
+            expect(mod.sendSocketNotification).not.toHaveBeenCalled();
+        });
+
+        it("clears chartTimer if pending", () => {
+            const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA });
+            mod.createChart = jest.fn();
+            mod.getDom(); // queues chartTimer
+            expect(mod.chartTimer).not.toBeNull();
+
+            mod.stop();
+            expect(mod.chartTimer).toBeNull();
+        });
+
+        it("does not fire createChart after stop() clears chartTimer", () => {
+            const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA });
+            mod.createChart = jest.fn();
+            mod.getDom();
+            mod.stop();
+
+            jest.advanceTimersByTime(500);
+            expect(mod.createChart).not.toHaveBeenCalled();
+        });
+
+        it("disposes the amCharts root if present", () => {
+            const mod = makeModuleInstance();
+            const fakeRoot = { dispose: jest.fn(), _logo: { dispose: jest.fn() } };
+            mod.root = fakeRoot;
+
+            mod.stop();
+            expect(fakeRoot.dispose).toHaveBeenCalledTimes(1);
+            expect(mod.root).toBeNull();
+            expect(mod.chart).toBeNull();
+        });
+
+        it("does not throw when no interval or root exists", () => {
+            const mod = makeModuleInstance();
+            expect(() => mod.stop()).not.toThrow();
+        });
+
+        it("logs to Log.info", () => {
+            const mod = makeModuleInstance();
+            mod.stop();
+            expect(global.Log.info).toHaveBeenCalled();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("suspend()", () => {
+        it("clears the update interval", () => {
+            const mod = makeModuleInstance();
+            mod.scheduleUpdate();
+            expect(mod.updateIntervalId).not.toBeNull();
+
+            mod.suspend();
+            expect(mod.updateIntervalId).toBeNull();
+        });
+
+        it("stops the interval from firing after suspend()", () => {
+            const mod = makeModuleInstance({ config: { updateInterval: 5000, haUrl: "http://ha.local", haToken: "x", entities: [] } });
+            mod.scheduleUpdate();
+            mod.suspend();
+
+            jest.advanceTimersByTime(5000);
+            expect(mod.sendSocketNotification).not.toHaveBeenCalled();
+        });
+
+        it("does not throw when no interval exists", () => {
+            const mod = makeModuleInstance();
+            expect(() => mod.suspend()).not.toThrow();
+        });
+
+        it("logs to Log.info", () => {
+            const mod = makeModuleInstance();
+            mod.suspend();
+            expect(global.Log.info).toHaveBeenCalled();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("resume()", () => {
+        it("schedules a new update interval after suspend", () => {
+            const mod = makeModuleInstance({ config: { updateInterval: 5000, haUrl: "http://ha.local", haToken: "x", entities: [] } });
+            mod.suspend();
+            expect(mod.updateIntervalId).toBeNull();
+
+            mod.resume();
+            expect(mod.updateIntervalId).not.toBeNull();
+        });
+
+        it("fires GET_TEMPERATURES after one interval following resume()", () => {
+            const mod = makeModuleInstance({ config: { updateInterval: 5000, haUrl: "http://ha.local", haToken: "x", entities: [] } });
+            mod.suspend();
+            mod.resume();
+
+            jest.advanceTimersByTime(5000);
+            expect(mod.sendSocketNotification).toHaveBeenCalledWith(
+                "GET_TEMPERATURES",
+                expect.any(Object)
+            );
+        });
+
+        it("logs to Log.info", () => {
+            const mod = makeModuleInstance();
+            mod.resume();
+            expect(global.Log.info).toHaveBeenCalled();
         });
     });
 

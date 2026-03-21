@@ -66,6 +66,9 @@ module.exports = NodeHelper.create({
 
                 console.log("Sending temperatures:", temperatures);
                 this.sendSocketNotification("TEMPERATURES_RESULT", temperatures);
+            })
+            .catch(error => {
+                console.error("Error processing temperature results:", error);
             });
     },
 
