@@ -10,7 +10,25 @@
     "url": "https://github.com/sanghviharshit/MMM-TemperatureRadar.git"
   },
   "keywords": ["magicmirror", "magicmirror2", "temperature", "radar", "home-assistant", "chart"],
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
   "dependencies": {
     "node-fetch": "^2.6.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "MMM-TemperatureRadar.js",
+      "node_helper.js"
+    ]
   }
 }
