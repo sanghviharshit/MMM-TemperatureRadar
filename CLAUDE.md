@@ -70,8 +70,8 @@ All config options have defaults defined in the `defaults` object within `MMM-Te
 defaults: {
     haUrl: "",          // Home Assistant base URL (empty = demo mode)
     haToken: "",        // HA long-lived access token
-    width: 400,         // Chart width in pixels
-    height: 400,        // Chart height in pixels
+    width: "200px",     // Chart width
+    height: "200px",    // Chart height
     updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
     entities: [],       // Array of {room, entity_id} objects
     units: "celsius",   // "celsius" or "fahrenheit"

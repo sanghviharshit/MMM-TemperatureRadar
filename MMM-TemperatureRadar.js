@@ -9,90 +9,101 @@
  * @license MIT
  */
 
+// Demo data used when Home Assistant is not configured or fetch fails.
+// unit_of_measurement is pre-attached so convertTemperature always has a fromUnit.
+const DEMO_DATA = [
+	{ room: "Living Room", temperature: 21.5, unit_of_measurement: "°C" },
+	{ room: "Kitchen",     temperature: 22.3, unit_of_measurement: "°C" },
+	{ room: "Bedroom",     temperature: 20.8, unit_of_measurement: "°C" },
+	{ room: "Bathroom",    temperature: 23.1, unit_of_measurement: "°C" },
+	{ room: "Office",      temperature: 21.7, unit_of_measurement: "°C" },
+	{ room: "Outdoor",     temperature: 5.5,  unit_of_measurement: "°C" }
+];
+
 Module.register("MMM-TemperatureRadar", {
-	// Your existing code with better comments...
 	defaults: {
 		updateInterval: 5 * 60 * 1000, // Update every 5 minutes
 		haUrl: "", // Home Assistant URL (e.g., "http://homeassistant.local:8123")
 		haToken: "", // Long-lived access token from Home Assistant
 		width: "200px", // Chart width
 		height: "200px", // Chart height
-		units: config.units, // Use global temperature units configuration
+		units: "celsius", // "celsius" or "fahrenheit"
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
-			{ room: "Kitchen", entity_id: "sensor.kitchen_temperature" },
-			{ room: "Bedroom", entity_id: "sensor.bedroom_temperature" },
-			{ room: "Bathroom", entity_id: "sensor.bathroom_temperature" },
-			{ room: "Office", entity_id: "sensor.office_temperature" },
-			{ room: "Outdoor", entity_id: "sensor.outdoor_temperature" }
+			{ room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
+			{ room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
+			{ room: "Bathroom",    entity_id: "sensor.bathroom_temperature" },
+			{ room: "Office",      entity_id: "sensor.office_temperature" },
+			{ room: "Outdoor",     entity_id: "sensor.outdoor_temperature" }
 		],
-		// Demo data used when Home Assistant is not configured
-		demoData: [
-			{ room: "Living Room", temperature: 21.5 },
-			{ room: "Kitchen", temperature: 22.3 },
-			{ room: "Bedroom", temperature: 20.8 },
-			{ room: "Bathroom", temperature: 23.1 },
-			{ room: "Office", temperature: 21.7 },
-			{ room: "Outdoor", temperature: 5.5 }
-		]
 	},
 
-    start: function() {
-        Log.info("Starting module: " + this.name);
-        this.temperatures = [];
-        this.loaded = false;
-        this.chart = null;
-        this.root = null;
-        
-        // Use demo data if HA not configured
-        if (!this.config.haUrl || !this.config.haToken) {
-            Log.info("Using demo data");
-            this.temperatures = [...this.config.demoData];
-            this.loaded = true;
-            this.updateDom(); // Add this line
-        } else {
-            Log.info("Fetching from HA");
-            this.sendSocketNotification("GET_TEMPERATURES", this.config);
-        }
-        
-        this.scheduleUpdate();
-    },
+	start: function() {
+		Log.info("Starting module: " + this.name);
+		this.temperatures = [];
+		this.loaded = false;
+		this.chart = null;
+		this.root = null;
+		this.chartTimer = null;
 
-    socketNotificationReceived: function(notification, payload) {
-        if (notification === "TEMPERATURES_RESULT") {
-            Log.info("Received temperatures:", payload);
-            this.temperatures = payload;
-            this.loaded = true;
-            this.updateDom();
-        }
-    },
+		// Use demo data if HA not configured
+		if (!this.config.haUrl || !this.config.haToken) {
+			Log.info("Using demo data");
+			this.temperatures = [...DEMO_DATA];
+			this.loaded = true;
+			this.updateDom();
+		} else {
+			Log.info("Fetching from HA");
+			this.sendSocketNotification("GET_TEMPERATURES", {
+				haUrl: this.config.haUrl,
+				haToken: this.config.haToken,
+				entities: this.config.entities
+			});
+		}
 
-    getDom: function() {
-        const wrapper = document.createElement("div");
-        wrapper.className = "temperature-radar-wrapper";
-        const chartDiv = document.createElement("div");
-        
-		chartDiv.id = "temperature-radar-chart";
-        chartDiv.style.width = this.config.width;
-        chartDiv.style.height = this.config.height;
-        
-        if (!this.loaded) {
-            wrapper.innerHTML = "Loading...";
-            return wrapper;
-        }
-        
-        wrapper.appendChild(chartDiv);
-        
-        // Create chart after a short delay to ensure DOM is ready
-        if (this.loaded && this.temperatures.length > 0) {
-            Log.info("Creating chart with data:", this.temperatures);
-            setTimeout(() => {
-                this.createChart();
-            }, 500);
-        }
-        
-        return wrapper;
-    },
+		this.scheduleUpdate();
+	},
+
+	socketNotificationReceived: function(notification, payload) {
+		if (notification === "TEMPERATURES_RESULT") {
+			Log.info("Received temperatures:", payload);
+			this.temperatures = payload;
+			this.loaded = true;
+			this.updateDom();
+		}
+	},
+
+	getDom: function() {
+		const wrapper = document.createElement("div");
+		wrapper.className = "temperature-radar-wrapper";
+		const chartDiv = document.createElement("div");
+
+		chartDiv.id = "temperature-radar-chart-" + this.identifier;
+		chartDiv.style.width = this.config.width;
+		chartDiv.style.height = this.config.height;
+
+		if (!this.loaded) {
+			wrapper.innerHTML = "Loading...";
+			return wrapper;
+		}
+
+		wrapper.appendChild(chartDiv);
+
+		// Create chart after a short delay to ensure DOM is ready.
+		// Clear any pending timer to prevent stacked chart-creation calls.
+		if (this.loaded && this.temperatures.length > 0) {
+			Log.info("Creating chart with data:", this.temperatures);
+			if (this.chartTimer) {
+				clearTimeout(this.chartTimer);
+			}
+			this.chartTimer = setTimeout(() => {
+				this.chartTimer = null;
+				this.createChart();
+			}, 500);
+		}
+
+		return wrapper;
+	},
 
 	getStyles: function () {
 		return ["MMM-TemperatureRadar.css"];
@@ -112,12 +123,15 @@ Module.register("MMM-TemperatureRadar", {
 		if (this.updateIntervalId) {
 			clearInterval(this.updateIntervalId);
 		}
-		
-		// Set up new interval
+
+		// Always send GET_TEMPERATURES — the node helper handles the no-HA fallback,
+		// ensuring demo-mode also gets periodic refreshes.
 		this.updateIntervalId = setInterval(() => {
-			if (this.config.haUrl && this.config.haToken) {
-				this.sendSocketNotification("GET_TEMPERATURES", this.config);
-			}
+			this.sendSocketNotification("GET_TEMPERATURES", {
+				haUrl: this.config.haUrl,
+				haToken: this.config.haToken,
+				entities: this.config.entities
+			});
 		}, this.config.updateInterval);
 	},
 
@@ -136,9 +150,9 @@ Module.register("MMM-TemperatureRadar", {
 				this.root.dispose();
 			}
 
-			// Create root element
-			this.root = am5.Root.new("temperature-radar-chart");
-            this.root._logo.dispose();
+			// Create root element using the instance-unique chart ID
+			this.root = am5.Root.new("temperature-radar-chart-" + this.identifier);
+			this.root._logo.dispose();
 			// Set themes
 			this.root.setThemes([am5themes_Animated.new(this.root)]);
 
@@ -154,8 +168,8 @@ Module.register("MMM-TemperatureRadar", {
 
 			// Create X axes and their renderers
 			var xRenderer = am5radar.AxisRendererCircular.new(this.root, {
-                minGridDistance: 0
-            });
+				minGridDistance: 0
+			});
 			xRenderer.grid.template.setAll({
 				stroke: am5.color(0xffffff),
 				strokeOpacity: 0.5,
@@ -179,8 +193,8 @@ Module.register("MMM-TemperatureRadar", {
 
 			// Create Y axes and their renderers
 			var yRenderer = am5radar.AxisRendererRadial.new(this.root, {
-                minGridDistance: 20,
-            });
+				minGridDistance: 20,
+			});
 
 			yRenderer.grid.template.setAll({
 				stroke: am5.color(0xffffff),
@@ -196,7 +210,7 @@ Module.register("MMM-TemperatureRadar", {
 			var yAxis = this.chart.yAxes.push(
 				am5xy.ValueAxis.new(this.root, {
 					renderer: yRenderer,
-                    numberFormat: this.config.units === "imperial" ? "#'°F'" : "#'°C'",
+					numberFormat: this.config.units === "fahrenheit" ? "#'°F'" : "#'°C'",
 				})
 			);
 
@@ -210,7 +224,7 @@ Module.register("MMM-TemperatureRadar", {
 					categoryXField: "room",
 					stroke: am5.color("#808080"),
 					tooltip: am5.Tooltip.new(this.root, {
-						labelText: "{valueY}" + (this.config.units === "imperial" ? "°F" : "°C")
+						labelText: "{valueY}" + (this.config.units === "fahrenheit" ? "°F" : "°C")
 					})
 				})
 			);
@@ -233,19 +247,18 @@ Module.register("MMM-TemperatureRadar", {
 					sprite: am5.Circle.new(root, {
 						radius: 5,
 						fill: am5.color(0x808080)
-						// stroke: am5.color(0x808080),
-						// strokeWidth: 2
 					})
 				});
 			});
 
 			// Convert temperatures to the configured unit
+			const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
 			const convertedTemperatures = this.temperatures.map(temp => ({
 				...temp,
 				temperature: this.convertTemperature(
 					temp.temperature,
 					temp.unit_of_measurement,
-					this.config.units === "imperial" ? "°F" : "°C"
+					toUnit
 				)
 			}));
 

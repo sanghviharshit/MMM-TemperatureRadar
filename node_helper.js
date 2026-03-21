@@ -1,6 +1,16 @@
 const NodeHelper = require("node_helper");
 const fetch = require("node-fetch");
 
+// Demo data used when Home Assistant is not configured or fetch fails.
+const DEMO_DATA = [
+    { room: "Living Room", temperature: 21.5, unit_of_measurement: "°C" },
+    { room: "Kitchen",     temperature: 22.3, unit_of_measurement: "°C" },
+    { room: "Bedroom",     temperature: 20.8, unit_of_measurement: "°C" },
+    { room: "Bathroom",    temperature: 23.1, unit_of_measurement: "°C" },
+    { room: "Office",      temperature: 21.7, unit_of_measurement: "°C" },
+    { room: "Outdoor",     temperature: 5.5,  unit_of_measurement: "°C" }
+];
+
 module.exports = NodeHelper.create({
     start: function() {
         console.log("Starting node helper for: " + this.name);
@@ -8,40 +18,40 @@ module.exports = NodeHelper.create({
 
     getTemperatures: function(config) {
         console.log("Fetching temperatures from HA");
-        
+
         if (!config.haUrl || !config.haToken) {
             console.log("No HA config, sending demo data");
-            // Add unit_of_measurement to demo data
-            const demoDataWithUnits = config.demoData.map(data => ({
-                ...data,
-                unit_of_measurement: "°C" // Demo data is in Celsius
-            }));
-            this.sendSocketNotification("TEMPERATURES_RESULT", demoDataWithUnits);
+            this.sendSocketNotification("TEMPERATURES_RESULT", DEMO_DATA);
             return;
         }
 
-        const promises = config.entities.map(entity =>
-            fetch(`${config.haUrl}/api/states/${entity.entity_id}`, {
+        const promises = config.entities.map(entity => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            return fetch(`${config.haUrl}/api/states/${entity.entity_id}`, {
+                signal: controller.signal,
                 headers: {
                     "Authorization": `Bearer ${config.haToken}`,
                     "Content-Type": "application/json"
                 }
             })
             .then(response => {
+                clearTimeout(timeoutId);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 return response.json();
             })
             .catch(error => {
+                clearTimeout(timeoutId);
                 console.error(`Error fetching data for ${entity.room}:`, error);
-                return null; // Return null instead of demo data on error
-            })
-        );
+                return null;
+            });
+        });
 
         Promise.all(promises)
             .then(results => {
-                // Filter out null results and map the valid ones
                 const temperatures = results
                     .map((data, index) => ({
                         room: config.entities[index].room,
@@ -53,19 +63,9 @@ module.exports = NodeHelper.create({
                         temperature: parseFloat(item.data.state),
                         unit_of_measurement: item.data.attributes?.unit_of_measurement || "°C"
                     }));
-                
+
                 console.log("Sending temperatures:", temperatures);
                 this.sendSocketNotification("TEMPERATURES_RESULT", temperatures);
-            })
-            .catch(error => {
-                console.error("Error fetching temperatures:", error);
-                console.log("Falling back to demo data");
-                // Add unit_of_measurement to demo data
-                const demoDataWithUnits = config.demoData.map(data => ({
-                    ...data,
-                    unit_of_measurement: "°C" // Demo data is in Celsius
-                }));
-                this.sendSocketNotification("TEMPERATURES_RESULT", demoDataWithUnits);
             });
     },
 

@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "description": "A MagicMirror module for displaying temperature readings in a radar chart",
   "main": "MMM-TemperatureRadar.js",
+  "author": "Harshit Sanghvi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sanghviharshit/MMM-TemperatureRadar.git"
+  },
+  "keywords": ["magicmirror", "magicmirror2", "temperature", "radar", "home-assistant", "chart"],
   "dependencies": {
     "node-fetch": "^2.6.1"
   }

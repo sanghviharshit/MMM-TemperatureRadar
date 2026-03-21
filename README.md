@@ -13,7 +13,7 @@ cd ~/MagicMirror/modules
 ```
 2. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/MMM-TemperatureRadar.git
+git clone https://github.com/sanghviharshit/MMM-TemperatureRadar.git
 ```
 
 3. Install dependencies:
@@ -49,9 +49,10 @@ Add the following configuration to your config/config.js file:
 |--------|-------------| 
 | haUrl | Your Home Assistant URL. Leave empty to use demo data. | 
 | haToken | Your Home Assistant long-lived access token. Required if using Home Assistant. | 
-| width | Width of the chart. Default: "100px" | 
-| height | Height of the chart. Default: "100px" | 
-| updateInterval | How often to update the data (in milliseconds). Default: 300000 (5 minutes) | 
+| width | Width of the chart. Default: `"200px"` |
+| height | Height of the chart. Default: `"200px"` |
+| updateInterval | How often to update the data (in milliseconds). Default: 300000 (5 minutes) |
+| units | Temperature unit to display. `"celsius"` or `"fahrenheit"`. Default: `"celsius"` |
 | entities | Array of objects containing room names and their corresponding Home Assistant entity IDs |
 
 ### Home Assistant Setup
