@@ -28,6 +28,7 @@ Module.register("MMM-TemperatureRadar", {
 		width: "200px", // Chart width
 		height: "200px", // Chart height
 		units: "celsius", // "celsius" or "fahrenheit"
+		coloredBullets: false, // color data points by temperature (blue→green→red)
 		notificationName: "TEMPERATURE_UPDATE", // notification name to listen for from other modules
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
@@ -174,6 +175,35 @@ Module.register("MMM-TemperatureRadar", {
 		}, this.config.updateInterval);
 	},
 
+	// Returns a hex color string for a temperature value (in display units).
+	// Blue (cold) → cyan → green (comfortable) → yellow → red (hot).
+	getTemperatureColor: function(temp) {
+		// Normalize to Celsius range for color mapping regardless of display unit
+		var celsius = temp;
+		if (this.config.units === "fahrenheit") {
+			celsius = (temp - 32) * 5 / 9;
+		}
+		// Clamp to 0–40°C range, map to 0–1
+		var t = Math.max(0, Math.min(40, celsius)) / 40;
+
+		// Color stops: 0=blue, 0.25=cyan, 0.5=green, 0.75=yellow, 1=red
+		var r, g, b;
+		if (t < 0.25) {
+			var p = t / 0.25;
+			r = 0;   g = Math.round(180 * p); b = Math.round(255 * (1 - p * 0.3));
+		} else if (t < 0.5) {
+			var p = (t - 0.25) / 0.25;
+			r = 0;   g = Math.round(180 + 75 * p); b = Math.round(178 * (1 - p));
+		} else if (t < 0.75) {
+			var p = (t - 0.5) / 0.25;
+			r = Math.round(255 * p); g = 255; b = 0;
+		} else {
+			var p = (t - 0.75) / 0.25;
+			r = 255; g = Math.round(255 * (1 - p)); b = 0;
+		}
+		return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+	},
+
 	convertTemperature: function(temp, fromUnit, toUnit) {
 		if (!fromUnit || !toUnit) return temp;
 		if (fromUnit === toUnit) return temp;
@@ -280,26 +310,32 @@ Module.register("MMM-TemperatureRadar", {
 				fill: am5.color("#808080")
 			});
 
-			// Add bullets
-			series.bullets.push((root, series, dataItem) => {
+			// Add bullets colored by temperature
+			var self = this;
+			series.bullets.push(function(root, series, dataItem) {
+				var color = (self.config.coloredBullets && dataItem.dataContext.color) || "#808080";
 				return am5.Bullet.new(root, {
 					sprite: am5.Circle.new(root, {
 						radius: 5,
-						fill: am5.color(0x808080)
+						fill: am5.color(color)
 					})
 				});
 			});
 
-			// Convert temperatures to the configured unit
+			// Convert temperatures to the configured unit and compute colors
 			const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
-			const convertedTemperatures = this.temperatures.map(temp => ({
-				...temp,
-				temperature: this.convertTemperature(
+			const convertedTemperatures = this.temperatures.map(temp => {
+				var converted = this.convertTemperature(
 					temp.temperature,
 					temp.unit_of_measurement,
 					toUnit
-				)
-			}));
+				);
+				return {
+					...temp,
+					temperature: converted,
+					color: this.getTemperatureColor(converted)
+				};
+			});
 
 			// Set data
 			xAxis.data.setAll(convertedTemperatures);
