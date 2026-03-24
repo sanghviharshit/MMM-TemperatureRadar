@@ -52,6 +52,7 @@ Module.register("MMM-TemperatureRadar", {
 		this.series = null;
 		this.chartTimer = null;
 		this.updateIntervalId = null;
+		this.timestampIntervalId = null;
 		this.lastUpdated = null;
 
 		// Use demo data if HA not configured
@@ -60,6 +61,7 @@ Module.register("MMM-TemperatureRadar", {
 			this.temperatures = [...DEMO_DATA];
 			this.loaded = true;
 			this.lastUpdated = new Date();
+			this.scheduleTimestampRefresh();
 			this.updateDom();
 		} else {
 			Log.info(this.name + ": Fetching from HA");
@@ -77,6 +79,10 @@ Module.register("MMM-TemperatureRadar", {
 		if (this.updateIntervalId) {
 			clearInterval(this.updateIntervalId);
 			this.updateIntervalId = null;
+		}
+		if (this.timestampIntervalId) {
+			clearInterval(this.timestampIntervalId);
+			this.timestampIntervalId = null;
 		}
 		if (this.chartTimer) {
 			clearTimeout(this.chartTimer);
@@ -97,11 +103,16 @@ Module.register("MMM-TemperatureRadar", {
 			clearInterval(this.updateIntervalId);
 			this.updateIntervalId = null;
 		}
+		if (this.timestampIntervalId) {
+			clearInterval(this.timestampIntervalId);
+			this.timestampIntervalId = null;
+		}
 	},
 
 	resume: function() {
 		Log.info("Resuming module: " + this.name);
 		this.scheduleUpdate();
+		this.scheduleTimestampRefresh();
 	},
 
 	notificationReceived: function(notification, payload, sender) {
@@ -122,6 +133,7 @@ Module.register("MMM-TemperatureRadar", {
 		this.temperatures = data;
 		this.loaded = true;
 		this.lastUpdated = new Date();
+		this.scheduleTimestampRefresh();
 		// If chart exists, update data in place for smooth animation
 		if (this.root && this.xAxis && this.series) {
 			var convertedTemperatures = this.getConvertedData();
@@ -148,6 +160,13 @@ Module.register("MMM-TemperatureRadar", {
 		if (el) {
 			el.textContent = "Updated " + this.formatTimeSince(this.lastUpdated);
 		}
+	},
+
+	scheduleTimestampRefresh: function() {
+		if (this.timestampIntervalId) return; // already running
+		this.timestampIntervalId = setInterval(() => {
+			this.updateTimestamp();
+		}, 60000); // refresh every minute
 	},
 
 	getDom: function() {
