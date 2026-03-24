@@ -33,8 +33,9 @@ Module.register("MMM-TemperatureRadar", {
 		chartColor: "#808080", // series line, fill, and bullet color
 		coloredBullets: false, // color data points by temperature (blue→green→red)
 		showValues: true, // show temperature values on axis labels
-		showTrends: true, // show ↑↓→ trend arrows next to values
+		showTrends: true, // show ▲/▼ trend indicators when temperature is changing
 		showLastUpdated: true, // show "Updated X min ago" below chart
+		staleThreshold: 10 * 60 * 1000, // ms before data is considered stale (default 10 min)
 		thresholdLow: null, // temperature below this is highlighted (in display units, null = disabled)
 		thresholdHigh: null, // temperature above this is highlighted (in display units, null = disabled)
 		thresholdColor: "#ff4444", // color for out-of-range bullets
@@ -195,15 +196,11 @@ Module.register("MMM-TemperatureRadar", {
 
 	getConvertedHumidityData: function() {
 		// Humidity is always in %, no unit conversion needed
-		// Build a map from original room name to the display label used by the X axis
-		var tempLabels = {};
-		this.getConvertedData().forEach(function(t) {
-			var originalRoom = t.room.split("\n")[0];
-			tempLabels[originalRoom] = t.room;
-		});
+		// Use cached room label map built during getConvertedData
+		var labels = this.roomLabelMap || {};
 		return this.humidityData.map(function(h) {
 			return {
-				room: tempLabels[h.room] || h.room,
+				room: labels[h.room] || h.room,
 				humidity: parseFloat(h.humidity || h.temperature || h.state || 0)
 			};
 		});
@@ -223,6 +220,12 @@ Module.register("MMM-TemperatureRadar", {
 		var el = document.getElementById("temperature-radar-updated-" + this.identifier);
 		if (el) {
 			el.textContent = "Updated " + this.formatTimeSince(this.lastUpdated);
+			var age = new Date() - this.lastUpdated;
+			if (age > this.config.staleThreshold) {
+				el.classList.add("stale");
+			} else {
+				el.classList.remove("stale");
+			}
 		}
 	},
 
@@ -351,6 +354,7 @@ Module.register("MMM-TemperatureRadar", {
 	getConvertedData: function() {
 		const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
 		const unitSuffix = this.config.units === "fahrenheit" ? "°F" : "°C";
+		this.roomLabelMap = {};
 		return this.temperatures.map(temp => {
 			var converted = this.convertTemperature(
 				temp.temperature,
@@ -366,10 +370,10 @@ Module.register("MMM-TemperatureRadar", {
 					var diff = converted - prevConverted;
 					if (diff > 0.1) valueStr += " ▲";
 					else if (diff < -0.1) valueStr += " ▼";
-					else valueStr += " ●";
 				}
 				label += "\n" + valueStr;
 			}
+			this.roomLabelMap[temp.room] = label;
 			return {
 				...temp,
 				room: label,
@@ -483,22 +487,25 @@ Module.register("MMM-TemperatureRadar", {
 				fill: am5.color(chartColor)
 			});
 
-			// Add bullets — threshold highlighting > coloredBullets > chartColor
-			var self = this;
-			this.series.bullets.push(function(root, series, dataItem) {
-				var temp = dataItem.dataContext.temperature;
-				var outOfRange = false;
-				if (self.config.thresholdLow !== null && temp < self.config.thresholdLow) outOfRange = true;
-				if (self.config.thresholdHigh !== null && temp > self.config.thresholdHigh) outOfRange = true;
-				var color = outOfRange ? self.config.thresholdColor :
-					(self.config.coloredBullets && dataItem.dataContext.color) || chartColor;
-				return am5.Bullet.new(root, {
-					sprite: am5.Circle.new(root, {
-						radius: outOfRange ? 7 : 5,
-						fill: am5.color(color)
-					})
+			// Add bullets only when they convey information (thresholds or colored mode)
+			var hasThresholds = this.config.thresholdLow !== null || this.config.thresholdHigh !== null;
+			if (hasThresholds || this.config.coloredBullets) {
+				var self = this;
+				this.series.bullets.push(function(root, series, dataItem) {
+					var temp = dataItem.dataContext.temperature;
+					var outOfRange = false;
+					if (self.config.thresholdLow !== null && temp < self.config.thresholdLow) outOfRange = true;
+					if (self.config.thresholdHigh !== null && temp > self.config.thresholdHigh) outOfRange = true;
+					var color = outOfRange ? self.config.thresholdColor :
+						(self.config.coloredBullets && dataItem.dataContext.color) || chartColor;
+					return am5.Bullet.new(root, {
+						sprite: am5.Circle.new(root, {
+							radius: outOfRange ? 7 : 4,
+							fill: am5.color(color)
+						})
+					});
 				});
-			});
+			}
 
 			// Create humidity series if configured
 			if (this.config.humidityEntities.length > 0 || this.humidityData.length > 0) {
@@ -543,15 +550,6 @@ Module.register("MMM-TemperatureRadar", {
 
 				this.humiditySeries.fills.template.setAll({
 					visible: false
-				});
-
-				this.humiditySeries.bullets.push(function(root) {
-					return am5.Bullet.new(root, {
-						sprite: am5.Circle.new(root, {
-							radius: 3,
-							fill: am5.color(humidityColor)
-						})
-					});
 				});
 			}
 

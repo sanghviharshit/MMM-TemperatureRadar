@@ -57,6 +57,8 @@ MagicMirror² modules consist of two parts that communicate via socket notificat
 
 Both modes go through `processTemperatureData()`, which updates data in place when the chart exists (smooth animation) or triggers a full DOM rebuild on first load.
 
+Humidity follows the same pattern: `GET_HUMIDITY`/`HUMIDITY_RESULT` socket notifications for HA pull mode, and `HUMIDITY_UPDATE` broadcast notification for push mode. Both go through `processHumidityData()`. Humidity has its own Y axis (0-100% scale) so it doesn't distort the temperature axis.
+
 ### Chart Library
 
 The radar chart is rendered using **amCharts 5**, loaded at runtime from CDN:
@@ -83,25 +85,28 @@ All config options have defaults defined in the `defaults` object within `MMM-Te
 
 ```js
 defaults: {
-    haUrl: "",          // Home Assistant base URL (empty = demo mode)
-    haToken: "",        // HA long-lived access token
-    width: "200px",     // Chart width
-    height: "200px",    // Chart height
-    updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
-    units: "celsius",   // "celsius" or "fahrenheit"
-    chartColor: "#808080", // series line, fill, and bullet color
-    coloredBullets: false, // color data points by temperature (blue→green→red)
-    showValues: true,  // show temperature values on axis labels
-    showLastUpdated: true, // show "Updated X min ago" below chart
-    notificationName: "TEMPERATURE_UPDATE", // listen for push data from other modules
-    entities: [         // Array of {room, entity_id} objects
-        { room: "Living Room", entity_id: "sensor.living_room_temperature" },
-        { room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
-        { room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
-        { room: "Bathroom",    entity_id: "sensor.bathroom_temperature" },
-        { room: "Office",      entity_id: "sensor.office_temperature" },
-        { room: "Outdoor",     entity_id: "sensor.outdoor_temperature" }
-    ],
+    // Data
+    haUrl: "",          haToken: "",
+    updateInterval: 5 * 60 * 1000,
+    units: "celsius",
+    entities: [ /* 6 default room/entity pairs */ ],
+    humidityEntities: [],
+    // Display
+    width: "200px",     height: "200px",
+    chartColor: "#808080",  humidityColor: "#4488cc",
+    coloredBullets: false,  showValues: true,
+    showTrends: true,       showLastUpdated: true,
+    staleThreshold: 10 * 60 * 1000,
+    // Thresholds
+    thresholdLow: null,     thresholdHigh: null,
+    thresholdColor: "#ff4444",
+    // Axis
+    minValue: null,         maxValue: null,
+    // Animation
+    rotateChart: false,     rotateSpeed: 60,
+    // Integration
+    notificationName: "TEMPERATURE_UPDATE",
+    humidityNotificationName: "HUMIDITY_UPDATE",
 }
 ```
 
@@ -136,16 +141,16 @@ Example `config.js` entry for MagicMirror²:
         haToken: "YOUR_LONG_LIVED_ACCESS_TOKEN",
         width: 400,
         height: 400,
-        updateInterval: 5 * 60 * 1000,
-        units: "celsius",
-        chartColor: "#808080",
-        coloredBullets: false,
-        showValues: true,
-        showLastUpdated: true,
         entities: [
             { room: "Living Room", entity_id: "sensor.living_room_temperature" },
             { room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
-        ]
+        ],
+        humidityEntities: [
+            { room: "Living Room", entity_id: "sensor.living_room_humidity" },
+            { room: "Bedroom",     entity_id: "sensor.bedroom_humidity" },
+        ],
+        thresholdLow: 18,
+        thresholdHigh: 26,
     }
 }
 ```
@@ -200,7 +205,11 @@ Response fields used:
 - **Preserve the demo data fallback** — it is a core feature for users without Home Assistant.
 - **Lifecycle methods**: The module implements `stop()`, `suspend()`, and `resume()`. `stop()` clears all timers (updateIntervalId, timestampIntervalId, chartTimer) and disposes the amCharts root. `suspend()` pauses both intervals; `resume()` restarts them. Always keep these in sync with `scheduleUpdate()` and `scheduleTimestampRefresh()`.
 - **Chart disposal**: Always call `this.root.dispose()` (amCharts5 root disposal) before re-creating the chart to prevent memory leaks. `stop()` handles this on module teardown. On data updates, `processTemperatureData()` updates data in place via `setAll()` for smooth animated transitions instead of full chart rebuild.
-- **Instance properties**: `this.xAxis` and `this.series` are stored for in-place data updates. These must be nulled in both `start()` and `stop()`.
+- **Instance properties**: `this.xAxis`, `this.series`, and `this.humiditySeries` are stored for in-place data updates. These must be nulled in both `start()` and `stop()`.
+- **Bullets**: By default, no bullet circles are rendered (clean look). Bullets only appear when `coloredBullets` is enabled or thresholds are configured. Out-of-range bullets are larger (7px vs 4px).
+- **Trend indicators**: `previousTemperatures` stores the last reading per room. ▲/▼ only show when temperature is changing (0.1 threshold). Stable = no indicator.
+- **Stale data**: Timestamp gets CSS class `stale` (orange) when data age exceeds `staleThreshold`.
+- **Rotation**: Uses amCharts `startAngle`/`endAngle` via `root.events.on("frameended")` so labels stay readable. Not CSS transform.
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
 - **MagicMirror² globals**: `Log`, `Module`, `NodeHelper` are injected by the framework — do not import them.
 - **node-fetch v2**: The project uses `node-fetch@2` (CommonJS). Do not upgrade to v3+ (ESM-only) without migrating `node_helper.js` to ESM.

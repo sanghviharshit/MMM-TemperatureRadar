@@ -9,3 +9,7 @@
     color: #888;
     margin-top: 2px;
 }
+
+.temperature-radar-updated.stale {
+    color: #ff8800;
+}
