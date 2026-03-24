@@ -43,10 +43,17 @@ MagicMirror² modules consist of two parts that communicate via socket notificat
 | `MMM-TemperatureRadar.js` | Browser | DOM rendering, chart creation, UI state |
 | `node_helper.js` | Node.js | HTTP requests to Home Assistant API |
 
-**Data flow:**
+**Data flow (two modes, can work simultaneously):**
+
+*Pull mode (Home Assistant):*
 1. Module calls `this.sendSocketNotification("GET_TEMPERATURES", {haUrl, haToken, entities})` on startup and on each update interval.
 2. `node_helper.js` receives the notification, fetches temperature data from Home Assistant (or returns demo data), then calls `this.sendSocketNotification("TEMPERATURES_RESULT", data)`.
 3. Module receives data via `socketNotificationReceived()` and re-renders the chart.
+
+*Push mode (inter-module notifications):*
+1. Any MagicMirror² module sends `this.sendNotification("TEMPERATURE_UPDATE", data)` where data is an array of `{room, temperature, unit_of_measurement}`.
+2. Module receives data via `notificationReceived()` and re-renders the chart.
+3. The notification name is configurable via `config.notificationName`.
 
 ### Chart Library
 
@@ -80,6 +87,7 @@ defaults: {
     height: "200px",    // Chart height
     updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
     units: "celsius",   // "celsius" or "fahrenheit"
+    notificationName: "TEMPERATURE_UPDATE", // listen for push data from other modules
     entities: [         // Array of {room, entity_id} objects
         { room: "Living Room", entity_id: "sensor.living_room_temperature" },
         { room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
@@ -93,7 +101,7 @@ defaults: {
 
 ### Demo Data Fallback
 
-When `haUrl` is empty or fetching fails, the module uses hardcoded demo data with 6 rooms and predefined temperatures. This ensures the module always renders something visible. Preserve this behavior when making changes.
+When `haUrl` is empty or fetching fails, the module uses hardcoded demo data with 6 rooms and predefined temperatures. This ensures the module always renders something visible. In notification-only mode (no HA config), demo data is shown until another module pushes data. Preserve this behavior when making changes.
 
 ### Temperature Units
 

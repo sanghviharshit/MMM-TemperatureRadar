@@ -56,6 +56,25 @@ Add the following configuration to your config/config.js file:
 | updateInterval | How often to update the data (in milliseconds). Default: 300000 (5 minutes) |
 | units | Temperature unit to display. `"celsius"` or `"fahrenheit"`. Default: `"celsius"` |
 | entities | Array of objects containing room names and their corresponding Home Assistant entity IDs |
+| notificationName | Notification name to listen for from other modules. Default: `"TEMPERATURE_UPDATE"` |
+
+### Data Sources
+
+The module supports two ways of receiving temperature data, and both can work simultaneously:
+
+**Home Assistant (pull)** — Configure `haUrl` and `haToken` to fetch from HA on an interval.
+
+**Module notifications (push)** — Any other MagicMirror² module can send temperature data via the notification system. This allows integration with MQTT, Zigbee2MQTT, or any custom module without needing Home Assistant.
+
+```javascript
+// Any module can push data like this:
+this.sendNotification("TEMPERATURE_UPDATE", [
+    { room: "Living Room", temperature: 21.5, unit_of_measurement: "°C" },
+    { room: "Bedroom", temperature: 20.1, unit_of_measurement: "°F" },
+]);
+```
+
+When no Home Assistant config is provided, the module starts with demo data and listens for push notifications. When HA is configured, it fetches on an interval but still accepts push notifications (the latest data wins).
 
 ### Home Assistant Setup
 1. In Home Assistant, go to your profile

@@ -28,6 +28,7 @@ Module.register("MMM-TemperatureRadar", {
 		width: "200px", // Chart width
 		height: "200px", // Chart height
 		units: "celsius", // "celsius" or "fahrenheit"
+		notificationName: "TEMPERATURE_UPDATE", // notification name to listen for from other modules
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
 			{ room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
@@ -49,20 +50,19 @@ Module.register("MMM-TemperatureRadar", {
 
 		// Use demo data if HA not configured
 		if (!this.config.haUrl || !this.config.haToken) {
-			Log.info("Using demo data");
+			Log.info(this.name + ": No HA config — using demo data (listening for " + this.config.notificationName + " notifications)");
 			this.temperatures = [...DEMO_DATA];
 			this.loaded = true;
 			this.updateDom();
 		} else {
-			Log.info("Fetching from HA");
+			Log.info(this.name + ": Fetching from HA");
 			this.sendSocketNotification("GET_TEMPERATURES", {
 				haUrl: this.config.haUrl,
 				haToken: this.config.haToken,
 				entities: this.config.entities
 			});
+			this.scheduleUpdate();
 		}
-
-		this.scheduleUpdate();
 	},
 
 	stop: function() {
@@ -93,6 +93,15 @@ Module.register("MMM-TemperatureRadar", {
 	resume: function() {
 		Log.info("Resuming module: " + this.name);
 		this.scheduleUpdate();
+	},
+
+	notificationReceived: function(notification, payload, sender) {
+		if (notification === this.config.notificationName && Array.isArray(payload)) {
+			Log.info(this.name + ": Received temperatures from " + (sender ? sender.name : "unknown"));
+			this.temperatures = payload;
+			this.loaded = true;
+			this.updateDom();
+		}
 	},
 
 	socketNotificationReceived: function(notification, payload) {

@@ -308,20 +308,52 @@ describe("MMM-TemperatureRadar module", () => {
             expect(mod.sendSocketNotification).not.toHaveBeenCalled();
         });
 
-        it("schedules a periodic update interval", () => {
-            expect(mod.updateIntervalId).not.toBeNull();
-        });
-
-        it("sends GET_TEMPERATURES after one updateInterval elapses", () => {
-            jest.advanceTimersByTime(mod.config.updateInterval);
-            expect(mod.sendSocketNotification).toHaveBeenCalledWith(
-                "GET_TEMPERATURES",
-                expect.any(Object)
-            );
+        it("does not schedule HA polling interval in demo mode", () => {
+            expect(mod.updateIntervalId).toBeNull();
         });
 
         it("calls Log.info at least once", () => {
             expect(global.Log.info).toHaveBeenCalled();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("notificationReceived() — push mode", () => {
+        let mod;
+
+        beforeEach(() => {
+            mod = makeModuleInstance({ config: {} });
+        });
+
+        it("updates temperatures when receiving TEMPERATURE_UPDATE", () => {
+            const data = [
+                { room: "Kitchen", temperature: 22.0, unit_of_measurement: "°C" }
+            ];
+            mod.notificationReceived("TEMPERATURE_UPDATE", data, { name: "MMM-SomeSensor" });
+            expect(mod.temperatures).toEqual(data);
+            expect(mod.loaded).toBe(true);
+            expect(mod.updateDom).toHaveBeenCalled();
+        });
+
+        it("ignores non-array payloads", () => {
+            mod.temperatures = [];
+            mod.notificationReceived("TEMPERATURE_UPDATE", "bad", null);
+            expect(mod.temperatures).toEqual([]);
+        });
+
+        it("ignores unrelated notifications", () => {
+            mod.temperatures = [];
+            mod.notificationReceived("SOME_OTHER", [{ room: "X", temperature: 1 }], null);
+            expect(mod.temperatures).toEqual([]);
+        });
+
+        it("uses custom notificationName from config", () => {
+            const customMod = makeModuleInstance({
+                config: { notificationName: "CUSTOM_TEMPS" }
+            });
+            const data = [{ room: "Office", temperature: 21.0, unit_of_measurement: "°C" }];
+            customMod.notificationReceived("CUSTOM_TEMPS", data, null);
+            expect(customMod.temperatures).toEqual(data);
         });
     });
 
