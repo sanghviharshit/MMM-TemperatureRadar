@@ -44,7 +44,7 @@ MagicMirror² modules consist of two parts that communicate via socket notificat
 | `node_helper.js` | Node.js | HTTP requests to Home Assistant API |
 
 **Data flow:**
-1. Module calls `this.sendSocketNotification("GET_TEMPERATURES", config)` on startup and on each update interval.
+1. Module calls `this.sendSocketNotification("GET_TEMPERATURES", {haUrl, haToken, entities})` on startup and on each update interval.
 2. `node_helper.js` receives the notification, fetches temperature data from Home Assistant (or returns demo data), then calls `this.sendSocketNotification("TEMPERATURES_RESULT", data)`.
 3. Module receives data via `socketNotificationReceived()` and re-renders the chart.
 
@@ -79,8 +79,15 @@ defaults: {
     width: "200px",     // Chart width
     height: "200px",    // Chart height
     updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
-    entities: [],       // Array of {room, entity_id} objects
     units: "celsius",   // "celsius" or "fahrenheit"
+    entities: [         // Array of {room, entity_id} objects
+        { room: "Living Room", entity_id: "sensor.living_room_temperature" },
+        { room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
+        { room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
+        { room: "Bathroom",    entity_id: "sensor.bathroom_temperature" },
+        { room: "Office",      entity_id: "sensor.office_temperature" },
+        { room: "Outdoor",     entity_id: "sensor.outdoor_temperature" }
+    ],
 }
 ```
 
@@ -178,4 +185,3 @@ Response fields used:
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
 - **MagicMirror² globals**: `Log`, `Module`, `NodeHelper` are injected by the framework — do not import them.
 - **node-fetch v2**: The project uses `node-fetch@2` (CommonJS). Do not upgrade to v3+ (ESM-only) without migrating `node_helper.js` to ESM.
-- **Branch convention**: Feature branches follow the pattern `claude/<description>-<id>`.

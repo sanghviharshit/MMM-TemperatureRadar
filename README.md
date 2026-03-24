@@ -33,6 +33,8 @@ Add the following configuration to your config/config.js file:
         haToken: "your_long_lived_access_token",
         width: "300px",
         height: "300px",
+        updateInterval: 5 * 60 * 1000, // 5 minutes
+        units: "celsius", // "celsius" or "fahrenheit"
         entities: [
             { room: "Living Room", entity_id: "sensor.living_room_temperature" },
             { room: "Kitchen", entity_id: "sensor.kitchen_temperature" },
