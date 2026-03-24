@@ -20,7 +20,7 @@ MMM-TemperatureRadar/
 ├── package.json              # npm metadata; dependencies: node-fetch@2; devDependencies: jest
 ├── README.md                 # User-facing documentation and config reference
 ├── LICENSE                   # MIT License
-├── screenshot.png            # Visual demo shown in README
+├── screenshots/              # Screenshot images shown in README
 ├── .gitignore                # Excludes node_modules/, package-lock.json, coverage/
 ├── tests/
 │   ├── node_helper.test.js            # Jest tests for node_helper.js

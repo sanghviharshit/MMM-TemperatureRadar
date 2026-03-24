@@ -2,8 +2,60 @@
 
 A MagicMirror² module that displays temperature readings from multiple rooms in a radar chart. Integrates with Home Assistant to show real-time temperature data, or can display demo data if Home Assistant is not configured.
 
-## Screenshot
-![MMM-TemperatureRadar Screenshot](screenshot.png)
+## Screenshots
+
+### Default (Clean Look)
+![Clean radar chart showing temperature data from six rooms](screenshots/screenshot-clean.png)
+
+```javascript
+{
+  module: "MMM-TemperatureRadar",
+  position: "middle_center",
+  config: {
+    width: "400px",
+    height: "400px"
+  }
+}
+```
+
+### Colored Bullets (`coloredBullets: true`)
+![Colored data points showing temperature by color](screenshots/screenshot-colored-bullets.png)
+
+```javascript
+{
+  module: "MMM-TemperatureRadar",
+  position: "middle_center",
+  config: {
+    width: "400px",
+    height: "400px",
+    coloredBullets: true
+  }
+}
+```
+
+### Temperature Thresholds (`thresholdLow: 15, thresholdHigh: 23`)
+![Out-of-range temperatures highlighted with red dots](screenshots/screenshot-colored-humidity.png)
+
+```javascript
+{
+  module: "MMM-TemperatureRadar",
+  position: "middle_center",
+  config: {
+    width: "400px",
+    height: "400px",
+    thresholdLow: 15,
+    thresholdHigh: 23,
+    humidityEntities: [
+      { room: "Living Room", entity_id: "sensor.living_room_humidity" },
+      { room: "Kitchen", entity_id: "sensor.kitchen_humidity" },
+      { room: "Bedroom", entity_id: "sensor.bedroom_humidity" },
+      { room: "Bathroom", entity_id: "sensor.bathroom_humidity" },
+      { room: "Office", entity_id: "sensor.office_humidity" },
+      { room: "Outdoor", entity_id: "sensor.outdoor_humidity" }
+    ]
+  }
+}
+```
 
 ## Installation
 
