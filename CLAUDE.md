@@ -52,8 +52,10 @@ MagicMirror² modules consist of two parts that communicate via socket notificat
 
 *Push mode (inter-module notifications):*
 1. Any MagicMirror² module sends `this.sendNotification("TEMPERATURE_UPDATE", data)` where data is an array of `{room, temperature, unit_of_measurement}`.
-2. Module receives data via `notificationReceived()` and re-renders the chart.
+2. Module receives data via `notificationReceived()` and updates the chart.
 3. The notification name is configurable via `config.notificationName`.
+
+Both modes go through `processTemperatureData()`, which updates data in place when the chart exists (smooth animation) or triggers a full DOM rebuild on first load.
 
 ### Chart Library
 
@@ -87,6 +89,8 @@ defaults: {
     height: "200px",    // Chart height
     updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
     units: "celsius",   // "celsius" or "fahrenheit"
+    coloredBullets: false, // color data points by temperature (blue→green→red)
+    showValues: true,  // show temperature values on axis labels
     notificationName: "TEMPERATURE_UPDATE", // listen for push data from other modules
     entities: [         // Array of {room, entity_id} objects
         { room: "Living Room", entity_id: "sensor.living_room_temperature" },
@@ -132,6 +136,8 @@ Example `config.js` entry for MagicMirror²:
         height: 400,
         updateInterval: 5 * 60 * 1000,
         units: "celsius",
+        coloredBullets: false,
+        showValues: true,
         entities: [
             { room: "Living Room", entity_id: "sensor.living_room_temperature" },
             { room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
@@ -189,7 +195,8 @@ Response fields used:
 - **Do not add `async/await`** when modifying existing code — maintain `.then()` style for consistency.
 - **Preserve the demo data fallback** — it is a core feature for users without Home Assistant.
 - **Lifecycle methods**: The module implements `stop()`, `suspend()`, and `resume()`. `stop()` clears all timers and disposes the amCharts root. `suspend()` pauses the update interval; `resume()` restarts it. Always keep these in sync with `scheduleUpdate()`.
-- **Chart disposal**: Always call `this.root.dispose()` (amCharts5 root disposal) before re-creating the chart to prevent memory leaks. `stop()` handles this on module teardown.
+- **Chart disposal**: Always call `this.root.dispose()` (amCharts5 root disposal) before re-creating the chart to prevent memory leaks. `stop()` handles this on module teardown. On data updates, `processTemperatureData()` updates data in place via `setAll()` for smooth animated transitions instead of full chart rebuild.
+- **Instance properties**: `this.xAxis` and `this.series` are stored for in-place data updates. These must be nulled in both `start()` and `stop()`.
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
 - **MagicMirror² globals**: `Log`, `Module`, `NodeHelper` are injected by the framework — do not import them.
 - **node-fetch v2**: The project uses `node-fetch@2` (CommonJS). Do not upgrade to v3+ (ESM-only) without migrating `node_helper.js` to ESM.
