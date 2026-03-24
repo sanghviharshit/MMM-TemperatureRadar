@@ -28,11 +28,21 @@ Module.register("MMM-TemperatureRadar", {
 		width: "200px", // Chart width
 		height: "200px", // Chart height
 		units: "celsius", // "celsius" or "fahrenheit"
+		minValue: null, // fixed Y axis minimum (null = auto)
+		maxValue: null, // fixed Y axis maximum (null = auto)
 		chartColor: "#808080", // series line, fill, and bullet color
 		coloredBullets: false, // color data points by temperature (blue→green→red)
 		showValues: true, // show temperature values on axis labels
+		showTrends: true, // show ↑↓→ trend arrows next to values
 		showLastUpdated: true, // show "Updated X min ago" below chart
+		thresholdLow: null, // temperature below this is highlighted (in display units, null = disabled)
+		thresholdHigh: null, // temperature above this is highlighted (in display units, null = disabled)
+		thresholdColor: "#ff4444", // color for out-of-range bullets
+		rotateChart: false, // slowly rotate the radar chart
+		rotateSpeed: 60, // seconds per full rotation
+		humidityColor: "#4488cc", // humidity series color
 		notificationName: "TEMPERATURE_UPDATE", // notification name to listen for from other modules
+		humidityNotificationName: "HUMIDITY_UPDATE", // notification for humidity push data
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
 			{ room: "Kitchen",     entity_id: "sensor.kitchen_temperature" },
@@ -41,6 +51,7 @@ Module.register("MMM-TemperatureRadar", {
 			{ room: "Office",      entity_id: "sensor.office_temperature" },
 			{ room: "Outdoor",     entity_id: "sensor.outdoor_temperature" }
 		],
+		humidityEntities: [], // Array of {room, entity_id} for humidity sensors
 	},
 
 	start: function() {
@@ -55,6 +66,9 @@ Module.register("MMM-TemperatureRadar", {
 		this.updateIntervalId = null;
 		this.timestampIntervalId = null;
 		this.lastUpdated = null;
+		this.previousTemperatures = {};
+		this.humidityData = [];
+		this.humiditySeries = null;
 
 		// Use demo data if HA not configured
 		if (!this.config.haUrl || !this.config.haToken) {
@@ -71,6 +85,13 @@ Module.register("MMM-TemperatureRadar", {
 				haToken: this.config.haToken,
 				entities: this.config.entities
 			});
+			if (this.config.humidityEntities.length > 0) {
+				this.sendSocketNotification("GET_HUMIDITY", {
+					haUrl: this.config.haUrl,
+					haToken: this.config.haToken,
+					entities: this.config.humidityEntities
+				});
+			}
 			this.scheduleUpdate();
 		}
 	},
@@ -95,6 +116,7 @@ Module.register("MMM-TemperatureRadar", {
 			this.chart = null;
 			this.xAxis = null;
 			this.series = null;
+			this.humiditySeries = null;
 		}
 	},
 
@@ -121,6 +143,10 @@ Module.register("MMM-TemperatureRadar", {
 			Log.info(this.name + ": Received temperatures from " + (sender ? sender.name : "unknown"));
 			this.processTemperatureData(payload);
 		}
+		if (notification === this.config.humidityNotificationName && Array.isArray(payload)) {
+			Log.info(this.name + ": Received humidity from " + (sender ? sender.name : "unknown"));
+			this.processHumidityData(payload);
+		}
 	},
 
 	socketNotificationReceived: function(notification, payload) {
@@ -128,9 +154,20 @@ Module.register("MMM-TemperatureRadar", {
 			Log.info("Received temperatures:", payload);
 			this.processTemperatureData(payload);
 		}
+		if (notification === "HUMIDITY_RESULT") {
+			Log.info("Received humidity:", payload);
+			this.processHumidityData(payload);
+		}
 	},
 
 	processTemperatureData: function(data) {
+		// Store previous readings for trend arrows
+		if (this.temperatures.length > 0) {
+			this.previousTemperatures = {};
+			this.temperatures.forEach(function(t) {
+				this.previousTemperatures[t.room] = t.temperature;
+			}.bind(this));
+		}
 		this.temperatures = data;
 		this.loaded = true;
 		this.lastUpdated = new Date();
@@ -140,10 +177,36 @@ Module.register("MMM-TemperatureRadar", {
 			var convertedTemperatures = this.getConvertedData();
 			this.xAxis.data.setAll(convertedTemperatures);
 			this.series.data.setAll(convertedTemperatures);
+			if (this.humiditySeries && this.humidityData.length > 0) {
+				this.humiditySeries.data.setAll(this.getConvertedHumidityData());
+			}
 			this.updateTimestamp();
 		} else {
 			this.updateDom();
 		}
+	},
+
+	processHumidityData: function(data) {
+		this.humidityData = data;
+		if (this.root && this.humiditySeries) {
+			this.humiditySeries.data.setAll(this.getConvertedHumidityData());
+		}
+	},
+
+	getConvertedHumidityData: function() {
+		// Humidity is always in %, no unit conversion needed
+		// Build a map from original room name to the display label used by the X axis
+		var tempLabels = {};
+		this.getConvertedData().forEach(function(t) {
+			var originalRoom = t.room.split("\n")[0];
+			tempLabels[originalRoom] = t.room;
+		});
+		return this.humidityData.map(function(h) {
+			return {
+				room: tempLabels[h.room] || h.room,
+				humidity: parseFloat(h.humidity || h.temperature || h.state || 0)
+			};
+		});
 	},
 
 	formatTimeSince: function(date) {
@@ -238,6 +301,13 @@ Module.register("MMM-TemperatureRadar", {
 				haToken: this.config.haToken,
 				entities: this.config.entities
 			});
+			if (this.config.humidityEntities.length > 0) {
+				this.sendSocketNotification("GET_HUMIDITY", {
+					haUrl: this.config.haUrl,
+					haToken: this.config.haToken,
+					entities: this.config.humidityEntities
+				});
+			}
 		}, this.config.updateInterval);
 	},
 
@@ -289,7 +359,16 @@ Module.register("MMM-TemperatureRadar", {
 			);
 			var label = temp.room;
 			if (this.config.showValues) {
-				label += "\n" + Math.round(converted * 10) / 10 + unitSuffix;
+				var valueStr = Math.round(converted * 10) / 10 + unitSuffix;
+				if (this.config.showTrends && this.previousTemperatures[temp.room] !== undefined) {
+					var prev = this.previousTemperatures[temp.room];
+					var prevConverted = this.convertTemperature(prev, temp.unit_of_measurement, toUnit);
+					var diff = converted - prevConverted;
+					if (diff > 0.1) valueStr += " ▲";
+					else if (diff < -0.1) valueStr += " ▼";
+					else valueStr += " ●";
+				}
+				label += "\n" + valueStr;
 			}
 			return {
 				...temp,
@@ -364,11 +443,15 @@ Module.register("MMM-TemperatureRadar", {
 				fontSize: "0.6em",
 			});
 
+			var yAxisConfig = {
+				renderer: yRenderer,
+				numberFormat: this.config.units === "fahrenheit" ? "#'°F'" : "#'°C'",
+			};
+			if (this.config.minValue !== null) yAxisConfig.min = this.config.minValue;
+			if (this.config.maxValue !== null) yAxisConfig.max = this.config.maxValue;
+			if (this.config.minValue !== null || this.config.maxValue !== null) yAxisConfig.strictMinMax = true;
 			this.chart.yAxes.push(
-				am5xy.ValueAxis.new(this.root, {
-					renderer: yRenderer,
-					numberFormat: this.config.units === "fahrenheit" ? "#'°F'" : "#'°C'",
-				})
+				am5xy.ValueAxis.new(this.root, yAxisConfig)
 			);
 
 			// Create series
@@ -400,26 +483,104 @@ Module.register("MMM-TemperatureRadar", {
 				fill: am5.color(chartColor)
 			});
 
-			// Add bullets colored by temperature
+			// Add bullets — threshold highlighting > coloredBullets > chartColor
 			var self = this;
 			this.series.bullets.push(function(root, series, dataItem) {
-				var color = (self.config.coloredBullets && dataItem.dataContext.color) || chartColor;
+				var temp = dataItem.dataContext.temperature;
+				var outOfRange = false;
+				if (self.config.thresholdLow !== null && temp < self.config.thresholdLow) outOfRange = true;
+				if (self.config.thresholdHigh !== null && temp > self.config.thresholdHigh) outOfRange = true;
+				var color = outOfRange ? self.config.thresholdColor :
+					(self.config.coloredBullets && dataItem.dataContext.color) || chartColor;
 				return am5.Bullet.new(root, {
 					sprite: am5.Circle.new(root, {
-						radius: 5,
+						radius: outOfRange ? 7 : 5,
 						fill: am5.color(color)
 					})
 				});
 			});
+
+			// Create humidity series if configured
+			if (this.config.humidityEntities.length > 0 || this.humidityData.length > 0) {
+				var humidityColor = this.config.humidityColor;
+
+				// Separate Y axis for humidity (0-100% scale), hidden labels to avoid clutter
+				var humidityYRenderer = am5radar.AxisRendererRadial.new(this.root, {
+					minGridDistance: 20,
+				});
+				humidityYRenderer.grid.template.setAll({ visible: false });
+				humidityYRenderer.labels.template.setAll({ visible: false });
+
+				this.chart.yAxes.push(
+					am5xy.ValueAxis.new(this.root, {
+						renderer: humidityYRenderer,
+						min: 0,
+						max: 100,
+						strictMinMax: true,
+					})
+				);
+
+				this.humiditySeries = this.chart.series.push(
+					am5radar.RadarLineSeries.new(this.root, {
+						name: "Humidity",
+						xAxis: this.xAxis,
+						yAxis: this.chart.yAxes.getIndex(1),
+						valueYField: "humidity",
+						categoryXField: "room",
+						stroke: am5.color(humidityColor),
+						tooltip: am5.Tooltip.new(this.root, {
+							labelText: "{valueY}%"
+						})
+					})
+				);
+
+				this.humiditySeries.strokes.template.setAll({
+					strokeWidth: 2,
+					stroke: am5.color(humidityColor),
+					strokeOpacity: 0.8,
+					strokeDasharray: [4, 4]
+				});
+
+				this.humiditySeries.fills.template.setAll({
+					visible: false
+				});
+
+				this.humiditySeries.bullets.push(function(root) {
+					return am5.Bullet.new(root, {
+						sprite: am5.Circle.new(root, {
+							radius: 3,
+							fill: am5.color(humidityColor)
+						})
+					});
+				});
+			}
 
 			// Set data
 			var convertedTemperatures = this.getConvertedData();
 			this.xAxis.data.setAll(convertedTemperatures);
 			this.series.data.setAll(convertedTemperatures);
 
+			if (this.humiditySeries && this.humidityData.length > 0) {
+				this.humiditySeries.data.setAll(this.getConvertedHumidityData());
+			}
+
 			// Animate chart and series in
 			this.series.appear(1000);
+			if (this.humiditySeries) this.humiditySeries.appear(1000);
 			this.chart.appear(1000, 100);
+
+			// Animate chart rotation via startAngle
+			if (this.config.rotateChart) {
+				var chart = this.chart;
+				var speed = this.config.rotateSpeed;
+				var startTime = Date.now();
+				this.root.events.on("frameended", function() {
+					var elapsed = (Date.now() - startTime) / 1000;
+					var angle = (elapsed / speed) * 360 % 360;
+					chart.set("startAngle", 270 + angle);
+					chart.set("endAngle", 270 + angle + 360);
+				});
+			}
 		});
 	}
 });

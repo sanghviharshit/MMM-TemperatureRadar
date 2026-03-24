@@ -140,6 +140,11 @@ function makeModuleInstance(overrides = {}) {
         root: null,
         chartTimer: null,
         updateIntervalId: null,
+        previousTemperatures: {},
+        lastUpdated: null,
+        timestampIntervalId: null,
+        humidityData: [],
+        humiditySeries: null,
     });
     // Apply any non-config overrides directly
     const { config: _, ...rest } = overrides;

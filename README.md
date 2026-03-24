@@ -56,8 +56,10 @@ Add the following configuration to your config/config.js file:
 | updateInterval | How often to update the data (in milliseconds). Default: 300000 (5 minutes) |
 | units | Temperature unit to display. `"celsius"` or `"fahrenheit"`. Default: `"celsius"` |
 | entities | Array of objects containing room names and their corresponding Home Assistant entity IDs |
+| chartColor | Color for the radar line, fill, and bullets. Any CSS color string. Default: `"#808080"` |
 | coloredBullets | Color data point circles by temperature (blue→green→red gradient). Default: `false` |
 | showValues | Show temperature values on axis labels. Default: `true` |
+| showLastUpdated | Show "Updated X min ago" text below the chart. Default: `true` |
 | notificationName | Notification name to listen for from other modules. Default: `"TEMPERATURE_UPDATE"` |
 
 ### Data Sources

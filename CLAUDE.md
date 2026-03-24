@@ -89,8 +89,10 @@ defaults: {
     height: "200px",    // Chart height
     updateInterval: 5 * 60 * 1000,  // 5 minutes in ms
     units: "celsius",   // "celsius" or "fahrenheit"
+    chartColor: "#808080", // series line, fill, and bullet color
     coloredBullets: false, // color data points by temperature (blue→green→red)
     showValues: true,  // show temperature values on axis labels
+    showLastUpdated: true, // show "Updated X min ago" below chart
     notificationName: "TEMPERATURE_UPDATE", // listen for push data from other modules
     entities: [         // Array of {room, entity_id} objects
         { room: "Living Room", entity_id: "sensor.living_room_temperature" },
@@ -136,8 +138,10 @@ Example `config.js` entry for MagicMirror²:
         height: 400,
         updateInterval: 5 * 60 * 1000,
         units: "celsius",
+        chartColor: "#808080",
         coloredBullets: false,
         showValues: true,
+        showLastUpdated: true,
         entities: [
             { room: "Living Room", entity_id: "sensor.living_room_temperature" },
             { room: "Bedroom",     entity_id: "sensor.bedroom_temperature" },
@@ -194,7 +198,7 @@ Response fields used:
 - **Do not add a build system** unless explicitly requested. The simplicity is intentional.
 - **Do not add `async/await`** when modifying existing code — maintain `.then()` style for consistency.
 - **Preserve the demo data fallback** — it is a core feature for users without Home Assistant.
-- **Lifecycle methods**: The module implements `stop()`, `suspend()`, and `resume()`. `stop()` clears all timers and disposes the amCharts root. `suspend()` pauses the update interval; `resume()` restarts it. Always keep these in sync with `scheduleUpdate()`.
+- **Lifecycle methods**: The module implements `stop()`, `suspend()`, and `resume()`. `stop()` clears all timers (updateIntervalId, timestampIntervalId, chartTimer) and disposes the amCharts root. `suspend()` pauses both intervals; `resume()` restarts them. Always keep these in sync with `scheduleUpdate()` and `scheduleTimestampRefresh()`.
 - **Chart disposal**: Always call `this.root.dispose()` (amCharts5 root disposal) before re-creating the chart to prevent memory leaks. `stop()` handles this on module teardown. On data updates, `processTemperatureData()` updates data in place via `setAll()` for smooth animated transitions instead of full chart rebuild.
 - **Instance properties**: `this.xAxis` and `this.series` are stored for in-place data updates. These must be nulled in both `start()` and `stop()`.
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
