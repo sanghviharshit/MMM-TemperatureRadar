@@ -1,5 +1,11 @@
 .temperature-radar-wrapper {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
     align-items: center;
+}
+
+.temperature-radar-updated {
+    font-size: 0.6em;
+    color: #888;
+    margin-top: 2px;
 }

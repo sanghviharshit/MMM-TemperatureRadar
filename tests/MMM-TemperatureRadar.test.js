@@ -536,9 +536,9 @@ describe("MMM-TemperatureRadar module", () => {
         it("normalizes numeric width to CSS string (e.g. 400 → '400px')", () => {
             const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA, config: { width: 400, height: 300 } });
             mod.getDom();
-            // The chartDiv is the second createElement call result
+            // The chartDiv is the second createElement call (wrapper, chartDiv, updatedDiv)
             const calls = global.document.createElement.mock.results;
-            const chartDiv = calls[calls.length - 1].value;
+            const chartDiv = calls[1].value;
             expect(chartDiv.style.width).toBe("400px");
             expect(chartDiv.style.height).toBe("300px");
         });
@@ -547,7 +547,7 @@ describe("MMM-TemperatureRadar module", () => {
             const mod = makeModuleInstance({ loaded: true, temperatures: DEMO_DATA, config: { width: "300px", height: "250px" } });
             mod.getDom();
             const calls = global.document.createElement.mock.results;
-            const chartDiv = calls[calls.length - 1].value;
+            const chartDiv = calls[1].value;
             expect(chartDiv.style.width).toBe("300px");
             expect(chartDiv.style.height).toBe("250px");
         });

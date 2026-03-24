@@ -30,6 +30,7 @@ Module.register("MMM-TemperatureRadar", {
 		units: "celsius", // "celsius" or "fahrenheit"
 		coloredBullets: false, // color data points by temperature (blue→green→red)
 		showValues: true, // show temperature values on axis labels
+		showLastUpdated: true, // show "Updated X min ago" below chart
 		notificationName: "TEMPERATURE_UPDATE", // notification name to listen for from other modules
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
@@ -51,12 +52,14 @@ Module.register("MMM-TemperatureRadar", {
 		this.series = null;
 		this.chartTimer = null;
 		this.updateIntervalId = null;
+		this.lastUpdated = null;
 
 		// Use demo data if HA not configured
 		if (!this.config.haUrl || !this.config.haToken) {
 			Log.info(this.name + ": No HA config — using demo data (listening for " + this.config.notificationName + " notifications)");
 			this.temperatures = [...DEMO_DATA];
 			this.loaded = true;
+			this.lastUpdated = new Date();
 			this.updateDom();
 		} else {
 			Log.info(this.name + ": Fetching from HA");
@@ -118,13 +121,32 @@ Module.register("MMM-TemperatureRadar", {
 	processTemperatureData: function(data) {
 		this.temperatures = data;
 		this.loaded = true;
+		this.lastUpdated = new Date();
 		// If chart exists, update data in place for smooth animation
 		if (this.root && this.xAxis && this.series) {
 			var convertedTemperatures = this.getConvertedData();
 			this.xAxis.data.setAll(convertedTemperatures);
 			this.series.data.setAll(convertedTemperatures);
+			this.updateTimestamp();
 		} else {
 			this.updateDom();
+		}
+	},
+
+	formatTimeSince: function(date) {
+		var seconds = Math.floor((new Date() - date) / 1000);
+		if (seconds < 60) return "just now";
+		var minutes = Math.floor(seconds / 60);
+		if (minutes < 60) return minutes + " min ago";
+		var hours = Math.floor(minutes / 60);
+		return hours + "h " + (minutes % 60) + "m ago";
+	},
+
+	updateTimestamp: function() {
+		if (!this.config.showLastUpdated || !this.lastUpdated) return;
+		var el = document.getElementById("temperature-radar-updated-" + this.identifier);
+		if (el) {
+			el.textContent = "Updated " + this.formatTimeSince(this.lastUpdated);
 		}
 	},
 
@@ -142,6 +164,16 @@ Module.register("MMM-TemperatureRadar", {
 		chartDiv.style.width = typeof this.config.width === "number" ? this.config.width + "px" : this.config.width;
 		chartDiv.style.height = typeof this.config.height === "number" ? this.config.height + "px" : this.config.height;
 		wrapper.appendChild(chartDiv);
+
+		if (this.config.showLastUpdated) {
+			const updatedDiv = document.createElement("div");
+			updatedDiv.id = "temperature-radar-updated-" + this.identifier;
+			updatedDiv.className = "temperature-radar-updated";
+			if (this.lastUpdated) {
+				updatedDiv.textContent = "Updated " + this.formatTimeSince(this.lastUpdated);
+			}
+			wrapper.appendChild(updatedDiv);
+		}
 
 		// Create chart after a short delay to ensure DOM is ready.
 		// Clear any pending timer to prevent stacked chart-creation calls.
