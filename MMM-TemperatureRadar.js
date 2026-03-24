@@ -28,6 +28,7 @@ Module.register("MMM-TemperatureRadar", {
 		width: "200px", // Chart width
 		height: "200px", // Chart height
 		units: "celsius", // "celsius" or "fahrenheit"
+		chartColor: "#808080", // series line, fill, and bullet color
 		coloredBullets: false, // color data points by temperature (blue→green→red)
 		showValues: true, // show temperature values on axis labels
 		showLastUpdated: true, // show "Updated X min ago" below chart
@@ -371,6 +372,7 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Create series
+			var chartColor = this.config.chartColor;
 			this.series = this.chart.series.push(
 				am5radar.RadarLineSeries.new(this.root, {
 					name: "Temperature",
@@ -378,7 +380,7 @@ Module.register("MMM-TemperatureRadar", {
 					yAxis: this.chart.yAxes.getIndex(0),
 					valueYField: "temperature",
 					categoryXField: "room",
-					stroke: am5.color("#808080"),
+					stroke: am5.color(chartColor),
 					tooltip: am5.Tooltip.new(this.root, {
 						labelText: "{valueY}" + (this.config.units === "fahrenheit" ? "°F" : "°C")
 					})
@@ -388,19 +390,20 @@ Module.register("MMM-TemperatureRadar", {
 			// Style series
 			this.series.strokes.template.setAll({
 				strokeWidth: 2,
-				stroke: am5.color(0x808080),
+				stroke: am5.color(chartColor),
 				strokeOpacity: 0.8
 			});
 
 			this.series.fills.template.setAll({
+				visible: true,
 				fillOpacity: 0.2,
-				fill: am5.color("#808080")
+				fill: am5.color(chartColor)
 			});
 
 			// Add bullets colored by temperature
 			var self = this;
 			this.series.bullets.push(function(root, series, dataItem) {
-				var color = (self.config.coloredBullets && dataItem.dataContext.color) || "#808080";
+				var color = (self.config.coloredBullets && dataItem.dataContext.color) || chartColor;
 				return am5.Bullet.new(root, {
 					sprite: am5.Circle.new(root, {
 						radius: 5,
