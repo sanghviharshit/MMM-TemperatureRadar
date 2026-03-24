@@ -46,7 +46,7 @@ function makeChainableStub() {
         // gets the RadarChart stub (with xAxes, yAxes, series)
         container: { children: { push: makePassthroughPush() } },
         xAxes:  { push: makePassthroughPush() },
-        yAxes:  { push: makePassthroughPush() },
+        yAxes:  { push: makePassthroughPush(), getIndex: jest.fn(() => makeChainableStub()) },
         series: { push: makePassthroughPush() },
     };
     return stub;

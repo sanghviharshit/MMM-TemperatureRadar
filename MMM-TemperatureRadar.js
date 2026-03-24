@@ -47,6 +47,8 @@ Module.register("MMM-TemperatureRadar", {
 		this.loaded = false;
 		this.chart = null;
 		this.root = null;
+		this.xAxis = null;
+		this.series = null;
 		this.chartTimer = null;
 		this.updateIntervalId = null;
 
@@ -81,6 +83,8 @@ Module.register("MMM-TemperatureRadar", {
 			this.root.dispose();
 			this.root = null;
 			this.chart = null;
+			this.xAxis = null;
+			this.series = null;
 		}
 	},
 
@@ -100,17 +104,26 @@ Module.register("MMM-TemperatureRadar", {
 	notificationReceived: function(notification, payload, sender) {
 		if (notification === this.config.notificationName && Array.isArray(payload)) {
 			Log.info(this.name + ": Received temperatures from " + (sender ? sender.name : "unknown"));
-			this.temperatures = payload;
-			this.loaded = true;
-			this.updateDom();
+			this.processTemperatureData(payload);
 		}
 	},
 
 	socketNotificationReceived: function(notification, payload) {
 		if (notification === "TEMPERATURES_RESULT") {
 			Log.info("Received temperatures:", payload);
-			this.temperatures = payload;
-			this.loaded = true;
+			this.processTemperatureData(payload);
+		}
+	},
+
+	processTemperatureData: function(data) {
+		this.temperatures = data;
+		this.loaded = true;
+		// If chart exists, update data in place for smooth animation
+		if (this.root && this.xAxis && this.series) {
+			var convertedTemperatures = this.getConvertedData();
+			this.xAxis.data.setAll(convertedTemperatures);
+			this.series.data.setAll(convertedTemperatures);
+		} else {
 			this.updateDom();
 		}
 	},
@@ -213,6 +226,28 @@ Module.register("MMM-TemperatureRadar", {
 		return temp;
 	},
 
+	getConvertedData: function() {
+		const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
+		const unitSuffix = this.config.units === "fahrenheit" ? "°F" : "°C";
+		return this.temperatures.map(temp => {
+			var converted = this.convertTemperature(
+				temp.temperature,
+				temp.unit_of_measurement,
+				toUnit
+			);
+			var label = temp.room;
+			if (this.config.showValues) {
+				label += "\n" + Math.round(converted * 10) / 10 + unitSuffix;
+			}
+			return {
+				...temp,
+				room: label,
+				temperature: converted,
+				color: this.getTemperatureColor(converted)
+			};
+		});
+	},
+
 	createChart: function () {
 		am5.ready(() => {
 			// Dispose of previous chart if it exists
@@ -252,7 +287,7 @@ Module.register("MMM-TemperatureRadar", {
 				radius: 10,
 			});
 
-			const xAxis = this.chart.xAxes.push(
+			this.xAxis = this.chart.xAxes.push(
 				am5xy.CategoryAxis.new(this.root, {
 					maxDeviation: 0,
 					categoryField: "room",
@@ -277,7 +312,7 @@ Module.register("MMM-TemperatureRadar", {
 				fontSize: "0.6em",
 			});
 
-			const yAxis = this.chart.yAxes.push(
+			this.chart.yAxes.push(
 				am5xy.ValueAxis.new(this.root, {
 					renderer: yRenderer,
 					numberFormat: this.config.units === "fahrenheit" ? "#'°F'" : "#'°C'",
@@ -285,11 +320,11 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Create series
-			const series = this.chart.series.push(
+			this.series = this.chart.series.push(
 				am5radar.RadarLineSeries.new(this.root, {
 					name: "Temperature",
-					xAxis: xAxis,
-					yAxis: yAxis,
+					xAxis: this.xAxis,
+					yAxis: this.chart.yAxes.getIndex(0),
 					valueYField: "temperature",
 					categoryXField: "room",
 					stroke: am5.color("#808080"),
@@ -300,20 +335,20 @@ Module.register("MMM-TemperatureRadar", {
 			);
 
 			// Style series
-			series.strokes.template.setAll({
+			this.series.strokes.template.setAll({
 				strokeWidth: 2,
 				stroke: am5.color(0x808080),
 				strokeOpacity: 0.8
 			});
 
-			series.fills.template.setAll({
+			this.series.fills.template.setAll({
 				fillOpacity: 0.2,
 				fill: am5.color("#808080")
 			});
 
 			// Add bullets colored by temperature
 			var self = this;
-			series.bullets.push(function(root, series, dataItem) {
+			this.series.bullets.push(function(root, series, dataItem) {
 				var color = (self.config.coloredBullets && dataItem.dataContext.color) || "#808080";
 				return am5.Bullet.new(root, {
 					sprite: am5.Circle.new(root, {
@@ -323,33 +358,13 @@ Module.register("MMM-TemperatureRadar", {
 				});
 			});
 
-			// Convert temperatures to the configured unit and compute colors
-			const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
-			const unitSuffix = this.config.units === "fahrenheit" ? "°F" : "°C";
-			const convertedTemperatures = this.temperatures.map(temp => {
-				var converted = this.convertTemperature(
-					temp.temperature,
-					temp.unit_of_measurement,
-					toUnit
-				);
-				var label = temp.room;
-				if (this.config.showValues) {
-					label += "\n" + Math.round(converted * 10) / 10 + unitSuffix;
-				}
-				return {
-					...temp,
-					room: label,
-					temperature: converted,
-					color: this.getTemperatureColor(converted)
-				};
-			});
-
 			// Set data
-			xAxis.data.setAll(convertedTemperatures);
-			series.data.setAll(convertedTemperatures);
+			var convertedTemperatures = this.getConvertedData();
+			this.xAxis.data.setAll(convertedTemperatures);
+			this.series.data.setAll(convertedTemperatures);
 
 			// Animate chart and series in
-			series.appear(1000);
+			this.series.appear(1000);
 			this.chart.appear(1000, 100);
 		});
 	}
