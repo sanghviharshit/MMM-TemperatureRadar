@@ -29,6 +29,7 @@ Module.register("MMM-TemperatureRadar", {
 		height: "200px", // Chart height
 		units: "celsius", // "celsius" or "fahrenheit"
 		coloredBullets: false, // color data points by temperature (blue→green→red)
+		showValues: true, // show temperature values on axis labels
 		notificationName: "TEMPERATURE_UPDATE", // notification name to listen for from other modules
 		entities: [
 			{ room: "Living Room", entity_id: "sensor.living_room_temperature" },
@@ -324,14 +325,20 @@ Module.register("MMM-TemperatureRadar", {
 
 			// Convert temperatures to the configured unit and compute colors
 			const toUnit = this.config.units === "fahrenheit" ? "°F" : "°C";
+			const unitSuffix = this.config.units === "fahrenheit" ? "°F" : "°C";
 			const convertedTemperatures = this.temperatures.map(temp => {
 				var converted = this.convertTemperature(
 					temp.temperature,
 					temp.unit_of_measurement,
 					toUnit
 				);
+				var label = temp.room;
+				if (this.config.showValues) {
+					label += "\n" + Math.round(converted * 10) / 10 + unitSuffix;
+				}
 				return {
 					...temp,
+					room: label,
 					temperature: converted,
 					color: this.getTemperatureColor(converted)
 				};
