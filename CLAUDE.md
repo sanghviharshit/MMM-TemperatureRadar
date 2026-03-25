@@ -17,7 +17,7 @@ MMM-TemperatureRadar/
 ├── MMM-TemperatureRadar.js   # Main module file (frontend, runs in browser)
 ├── node_helper.js            # Backend helper (runs in Node.js)
 ├── MMM-TemperatureRadar.css  # Module styles
-├── package.json              # npm metadata; dependencies: node-fetch@2; devDependencies: jest
+├── package.json              # npm metadata; devDependencies: jest
 ├── README.md                 # User-facing documentation and config reference
 ├── LICENSE                   # MIT License
 ├── screenshots/              # Screenshot images shown in README
@@ -162,6 +162,11 @@ Example `config.js` entry for MagicMirror²:
 ```bash
 cd ~/MagicMirror/modules
 git clone https://github.com/sanghviharshit/MMM-TemperatureRadar
+```
+
+No `npm install` needed for runtime. For development (running tests), install devDependencies:
+
+```bash
 cd MMM-TemperatureRadar
 npm install
 ```
@@ -212,4 +217,4 @@ Response fields used:
 - **Rotation**: Uses amCharts `startAngle`/`endAngle` via `root.events.on("frameended")` so labels stay readable. Not CSS transform.
 - **CDN scripts**: amCharts 5 is loaded from CDN. Do not add it as an npm dependency.
 - **MagicMirror² globals**: `Log`, `Module`, `NodeHelper` are injected by the framework — do not import them.
-- **node-fetch v2**: The project uses `node-fetch@2` (CommonJS). Do not upgrade to v3+ (ESM-only) without migrating `node_helper.js` to ESM.
+- **No fetch dependency**: The project uses Node.js built-in `fetch` (available in Node 18+). No `node-fetch` package needed.

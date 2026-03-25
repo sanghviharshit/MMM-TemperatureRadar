@@ -68,11 +68,7 @@ cd ~/MagicMirror/modules
 git clone https://github.com/sanghviharshit/MMM-TemperatureRadar.git
 ```
 
-3. Install dependencies:
-```bash
-cd MMM-TemperatureRadar
-npm install
-```
+No `npm install` needed — there are no runtime dependencies.
 
 ## Configuration
 Add the following configuration to your config/config.js file:
@@ -176,7 +172,6 @@ To update the module to the latest version:
 ```
 cd ~/MagicMirror/modules/MMM-TemperatureRadar
 git pull
-npm install
 ```
 
 ## Contributing

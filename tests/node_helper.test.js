@@ -4,7 +4,7 @@
  * Tests for node_helper.js.
  *
  * Strategy:
- *  - jest.mock('node-fetch') intercepts all fetch calls.
+ *  - global.fetch is mocked with jest.fn() to intercept all fetch calls.
  *  - NodeHelper is replaced with a minimal stub whose .create() captures the
  *    handler object and returns it with a spy on sendSocketNotification.
  *  - We call getTemperatures() and socketNotificationReceived() directly.
@@ -12,8 +12,7 @@
 
 "use strict";
 
-jest.mock("node-fetch");
-const fetch = require("node-fetch");
+global.fetch = jest.fn();
 
 // ---- NodeHelper stub -------------------------------------------------------
 // node_helper.js does:  module.exports = NodeHelper.create({ ... })

@@ -1,5 +1,4 @@
 const NodeHelper = require("node_helper");
-const fetch = require("node-fetch");
 
 // Demo data used when Home Assistant is not configured or fetch fails.
 const DEMO_DATA = [
